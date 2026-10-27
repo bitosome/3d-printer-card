@@ -6,12 +6,14 @@ import {
   glowStyles,
   headerStyles,
   metricStyles,
+  navigationStyles,
 } from "@bitosome/ha-card-ui";
 
 export const cardStyles = [
   familyStyles,
   headerStyles,
   metricStyles,
+  navigationStyles,
   dialogStyles,
   glowStyles,
   componentStyles,
@@ -20,6 +22,7 @@ export const cardStyles = [
       display: block;
       color: var(--primary-text-color, #1b1b1b);
       font-family: var(--family-font);
+      scroll-margin-top: 56px;
     }
     :host([hidden]) {
       display: none;
@@ -41,6 +44,11 @@ export const cardStyles = [
       min-width: 0;
     }
     .root {
+      display: grid;
+      gap: var(--large-gap);
+      min-width: 0;
+    }
+    .panel {
       display: grid;
       gap: var(--large-gap);
       min-width: 0;
@@ -107,13 +115,6 @@ export const cardStyles = [
     }
     .family-subtitle .sep {
       opacity: 0.55;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      margin: -6px -2px 0 0;
-      flex: 0 0 auto;
     }
     .status-chip {
       --status-color: var(--secondary-text-color);
@@ -300,6 +301,7 @@ export const cardStyles = [
       overflow-wrap: anywhere;
     }
     .hero-art {
+      position: relative;
       width: 84px;
       height: 84px;
       flex: 0 0 84px;
@@ -321,6 +323,35 @@ export const cardStyles = [
       height: 100%;
       object-fit: cover;
       display: block;
+      transition: transform 0.2s ease;
+    }
+    button.hero-art {
+      padding: 0;
+      cursor: pointer;
+    }
+    .hero-art-expand {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: rgba(5, 8, 12, 0.58);
+      backdrop-filter: blur(4px);
+    }
+    .hero-art-expand ha-icon {
+      width: 13px;
+      height: 13px;
+      --mdc-icon-size: 13px;
+      opacity: 1;
+    }
+    @media (hover: hover) {
+      button.hero-art:hover img {
+        transform: scale(1.04);
+      }
     }
     .hero-art ha-icon {
       width: 28px;
@@ -603,10 +634,27 @@ export const cardStyles = [
       flex-direction: column;
       justify-content: center;
       gap: 4px;
+      width: 100%;
       min-width: 0;
       min-height: 56px;
       padding: 9px 12px;
+      border: 0;
       background: var(--family-tile);
+      text-align: start;
+      font: inherit;
+      color: inherit;
+    }
+    button.telemetry-cell {
+      cursor: pointer;
+    }
+    @media (hover: hover) {
+      button.telemetry-cell:hover {
+        background: color-mix(
+          in srgb,
+          var(--primary-text-color) 6%,
+          var(--family-tile)
+        );
+      }
     }
     .telemetry-label {
       color: var(--secondary-text-color);
@@ -946,6 +994,178 @@ export const cardStyles = [
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 7px;
       margin-top: 10px;
+    }
+
+    /* AMS summary and page ---------------------------------------------- */
+    .ams-summary {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .ams-all {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 44px;
+      padding: 8px 6px 8px 10px;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--primary-color, var(--status-active-color));
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .ams-all ha-icon {
+      width: 18px;
+      height: 18px;
+      --mdc-icon-size: 18px;
+    }
+    .ams-summary-grid {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    @container (min-width: 560px) {
+      .ams-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    .ams-summary-tile {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 7px;
+      min-height: 92px;
+      padding: 12px;
+      border: 1px solid
+        color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+      border-radius: var(--tile-border-radius, 14px);
+      text-align: start;
+      color: inherit;
+      cursor: pointer;
+    }
+    @media (hover: hover) {
+      .ams-summary-tile:hover {
+        background: color-mix(
+          in srgb,
+          var(--primary-text-color) 5%,
+          var(--family-tile)
+        );
+      }
+    }
+    .ams-summary-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px 8px;
+      min-width: 0;
+    }
+    .ams-summary-head .ams-name {
+      font-size: 12.5px;
+    }
+    .ams-summary-tray {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .ams-summary-tray .tray-swatch {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 24px;
+      border-radius: 7px;
+    }
+    .ams-summary-copy {
+      display: grid;
+      gap: 1px;
+      min-width: 0;
+    }
+    .ams-summary-copy strong {
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ams-summary-copy small {
+      color: var(--secondary-text-color);
+      font-size: 10px;
+      line-height: 1.35;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ams-summary-dots {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
+    .ams-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      background-color: color-mix(
+        in srgb,
+        var(--primary-text-color) 12%,
+        transparent
+      );
+      flex: 0 0 10px;
+    }
+    .ams-dot.none {
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent 0 2px,
+        rgba(127, 127, 127, 0.3) 2px 4px
+      );
+    }
+    .ams-dot.active {
+      outline: 2px solid var(--status-active-color);
+      outline-offset: 1px;
+    }
+    .ams-dot.empty {
+      opacity: 0.35;
+    }
+    .ams-summary-loaded {
+      margin-left: auto;
+      color: var(--secondary-text-color);
+      font-size: 10px;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+    .ams-page {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    /* Image preview ------------------------------------------------------ */
+    .preview-dialog {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+    .preview-large {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 12px;
+      background: color-mix(
+        in srgb,
+        var(--primary-text-color) 4%,
+        transparent
+      );
+    }
+    .preview-caption {
+      margin: 0;
+      color: var(--secondary-text-color);
+      font-size: 11.5px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     /* Dialog ------------------------------------------------------------- */
@@ -1318,9 +1538,6 @@ export const cardStyles = [
         width: 68px;
         height: 68px;
         flex-basis: 68px;
-      }
-      .header-history {
-        display: none;
       }
       .cost-label {
         white-space: normal;

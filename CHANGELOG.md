@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 — 2026-10-27
+
+- Added the shared bottom navigation: **Overview**, **AMS**, **History** and
+  **Details**, matching the heat pump card. Overview and AMS are inline pages;
+  History and Details open the common modal flow.
+- Metric and telemetry tiles now open Home Assistant's native entity more-info
+  instead of the full details dialog. The chamber temperature tile, for example,
+  opens the chamber sensor.
+- The overview now shows a compact AMS summary (active tray, colours, loaded
+  count); the dedicated AMS page keeps the full unit/tray view.
+- The print cover image is now a button that opens a full print-preview dialog.
+- The camera tile reuses the camera-card live-stream bootstrap: standard
+  `ha-camera-stream`/`ha-web-rtc-player` elements, a loading state and a
+  live/snapshot toggle.
+- Removed the duplicate header History/Details icons; the bottom navigation and
+  the cost/chart shortcuts are the navigation.
+- Updated preview and documentation screenshots.
+
 ## 0.1.1 — 2026-10-27
 
 - The camera tile can now switch between the live stream and the camera

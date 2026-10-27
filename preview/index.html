@@ -281,11 +281,21 @@
         if (chrome === "0") value.delete("chrome");
         return value.toString();
       };
+      const pageQuery = (next) => {
+        const value = new URLSearchParams(base);
+        value.set("width", String(width));
+        value.set("theme", theme);
+        value.set("chrome", chrome);
+        if (next) value.set("page", next);
+        if (chrome === "0") value.delete("chrome");
+        return value.toString();
+      };
       makeLink("Light", themeQuery("light"), theme === "light");
       makeLink("Dark", themeQuery("dark"), theme === "dark");
       makeLink("Mobile 320", widthQuery(320), width === 320);
       makeLink("Mobile 420", widthQuery(420), width === 420);
       makeLink("Desktop 760", widthQuery(760), width === 760);
+      makeLink("AMS", pageQuery("ams"), params.get("page") === "ams");
       makeLink("History", dialogQuery("history"), params.get("dialog") === "history");
       makeLink("Details", dialogQuery("details"), params.get("dialog") === "details");
 
@@ -298,13 +308,15 @@
       await card.updateComplete;
       await new Promise((resolve) => setTimeout(resolve, 650));
 
+      if (params.get("page") === "ams") {
+        card.shadowRoot?.querySelector('[data-nav="ams"]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
       const dialog = params.get("dialog");
       if (dialog === "history") {
         card.shadowRoot?.querySelector(".cost-button")?.click();
       } else if (dialog === "details") {
-        card.shadowRoot
-          ?.querySelector(".header-actions .family-icon-button:last-child")
-          ?.click();
+        card.shadowRoot?.querySelector('[data-nav="details"]')?.click();
       }
       await new Promise((resolve) => setTimeout(resolve, 900));
       window.__previewReady = true;

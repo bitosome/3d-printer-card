@@ -80,6 +80,7 @@ import {
 } from "./model";
 import type {
   AmsTray,
+  AmsUnit,
   CardConfig,
   ExternalSpool,
   HistoryData,
@@ -97,7 +98,8 @@ const CHART_BUCKET_MS = 5 * 60 * 1000;
 const LIVE_SAMPLE_MIN_MS = 5_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-type DialogPage = "history" | "details";
+type MainPage = "overview" | "ams";
+type DialogPage = "history" | "details" | "preview";
 
 function parseTime(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -143,6 +145,7 @@ export class BambuPrinterCard extends LitElement {
 
   @property({ attribute: false }) hass?: HomeAssistant;
   @state() private config?: CardConfig;
+  @state() private page: MainPage = "overview";
   @state() private printer: PrinterEntities | null = null;
   @state() private overview: OverviewData | null = null;
   @state() private overviewLoading = false;
@@ -195,13 +198,14 @@ export class BambuPrinterCard extends LitElement {
     this.imageFailed = false;
     this.cameraLoadStarted = false;
     this.cameraLive = true;
+    this.page = "overview";
     this.clearFinishTimer();
     if (this.hass) this.handleHass();
     this.requestUpdate();
   }
 
   getCardSize(): number {
-    return 14;
+    return this.page === "overview" ? 14 : 8;
   }
 
   getGridOptions(): { columns: number; min_columns: number; rows: string } {
@@ -951,6 +955,11 @@ export class BambuPrinterCard extends LitElement {
   // Camera
   // -------------------------------------------------------------------------
 
+  private get cameraUsesWebRtc(): boolean {
+    const type = this.printer?.camera?.attributes?.frontend_stream_type;
+    return typeof type === "string" && type.toLowerCase() === "web_rtc";
+  }
+
   private async ensureCameraElements(): Promise<void> {
     if (
       this.cameraLoadStarted ||
@@ -960,6 +969,12 @@ export class BambuPrinterCard extends LitElement {
       return;
     }
     this.cameraLoadStarted = true;
+    const cameraId = this.printer.camera.entity_id;
+    const tag = this.cameraUsesWebRtc
+      ? "ha-web-rtc-player"
+      : "ha-camera-stream";
+    // Reuse the camera-card bootstrap: creating a picture-entity card asks the
+    // HA frontend to import its camera stream / WebRTC elements.
     const helpers = (window as unknown as { loadCardHelpers?: () => Promise<unknown> })
       .loadCardHelpers;
     if (typeof helpers === "function") {
@@ -969,7 +984,7 @@ export class BambuPrinterCard extends LitElement {
         };
         await loaded.createCardElement?.({
           type: "picture-entity",
-          entity: this.printer.camera.entity_id,
+          entity: cameraId,
           camera_view: "live",
         });
       } catch {
@@ -977,12 +992,12 @@ export class BambuPrinterCard extends LitElement {
       }
     }
     if (typeof customElements === "undefined") return;
-    if (customElements.get("ha-camera-stream")) {
+    if (customElements.get(tag)) {
       this.cameraReady = true;
       return;
     }
     try {
-      await customElements.whenDefined("ha-camera-stream");
+      await customElements.whenDefined(tag);
       this.cameraReady = true;
     } catch {
       // Leave the snapshot fallback in place.
@@ -1021,13 +1036,23 @@ export class BambuPrinterCard extends LitElement {
   private renderDialog() {
     const page = this.flow.current;
     if (!page) return nothing;
+    const titles: Record<DialogPage, string> = {
+      history: "Print history",
+      details: "Printer details",
+      preview: "Print preview",
+    };
     const history = page === "history";
     return renderFamilyDialog(this.flow, {
-      title: history ? "Print history" : "Printer details",
-      content: history ? this.renderHistory() : this.renderDetails(),
+      title: titles[page],
+      content:
+        page === "history"
+          ? this.renderHistory()
+          : page === "details"
+            ? this.renderDetails()
+            : this.renderPreview(),
       footer: history ? this.renderHistoryFooter() : undefined,
       wide: true,
-      long: true,
+      long: history || page === "details",
     });
   }
 
@@ -1066,6 +1091,66 @@ export class BambuPrinterCard extends LitElement {
       </ha-card>
       ${this.renderDialog()}
     `;
+  }
+
+  private showPage(page: MainPage): void {
+    if (this.flow.active) this.flow.close();
+    this.page = page;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      if (!this.isConnected || typeof this.scrollIntoView !== "function") return;
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      this.scrollIntoView({
+        behavior: reduced ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  private renderNav(): TemplateResult | typeof nothing {
+    if (!this.printer) return nothing;
+    const items: {
+      page: MainPage | "history" | "details";
+      label: string;
+      icon: string;
+      dialog?: boolean;
+    }[] = [
+      { page: "overview", label: "Overview", icon: "mdi:home-outline" },
+      { page: "ams", label: "AMS", icon: "mdi:palette-swatch-outline" },
+      { page: "history", label: "History", icon: UI_ICONS.history, dialog: true },
+      { page: "details", label: "Details", icon: UI_ICONS.details, dialog: true },
+    ];
+    const visible = this.config?.show_ams === false
+      ? items.filter((item) => item.page !== "ams")
+      : items;
+    return html`<nav
+      class="family-navigation"
+      aria-label="Printer sections"
+      style=${`--family-nav-columns:${visible.length}`}
+    >
+      ${visible.map(
+        (item) => html`<button
+          type="button"
+          data-nav=${item.page}
+          aria-current=${!item.dialog && this.page === item.page
+            ? "page"
+            : "false"}
+          aria-haspopup=${item.dialog ? "dialog" : nothing}
+          @click=${(event: MouseEvent) => {
+            if (item.dialog) {
+              this.openDialog(
+                item.page as DialogPage,
+                event.currentTarget as HTMLElement,
+              );
+            } else {
+              this.showPage(item.page as MainPage);
+            }
+          }}
+        >
+          <ha-icon .icon=${item.icon} aria-hidden="true"></ha-icon>${item.label}
+        </button>`,
+      )}
+    </nav>`;
   }
 
   private latestUpdate(printer: PrinterEntities): number | null {
@@ -1110,30 +1195,6 @@ export class BambuPrinterCard extends LitElement {
           </span>
         </div>
         <div class="family-subtitle">${subtitle}</div>
-      </div>
-      <div class="header-actions">
-        <button
-          class="family-icon-button header-history"
-          type="button"
-          title="Print history"
-          aria-label="Open print history"
-          aria-haspopup="dialog"
-          @click=${(event: MouseEvent) =>
-            this.openDialog("history", event.currentTarget as HTMLElement)}
-        >
-          <ha-icon .icon=${UI_ICONS.history} aria-hidden="true"></ha-icon>
-        </button>
-        <button
-          class="family-icon-button"
-          type="button"
-          title="Printer details"
-          aria-label="Open printer details"
-          aria-haspopup="dialog"
-          @click=${(event: MouseEvent) =>
-            this.openDialog("details", event.currentTarget as HTMLElement)}
-        >
-          <ha-icon .icon=${UI_ICONS.details} aria-hidden="true"></ha-icon>
-        </button>
       </div>
     </header>`;
   }
@@ -1221,10 +1282,42 @@ export class BambuPrinterCard extends LitElement {
             true,
           );
     }
+    return html`<main class="panel" aria-label=${`${this.page} panel`}>
+        ${this.page === "ams" ? this.renderAmsPage() : this.renderOverviewPage()}
+      </main>
+      ${this.renderNav()}`;
+  }
+
+  private renderOverviewPage(): TemplateResult {
     return html`
       ${this.renderOverviewGrid()} ${this.renderMetrics()}
-      ${this.renderTelemetry()} ${this.renderChart()} ${this.renderAms()}
+      ${this.renderTelemetry()} ${this.renderChart()} ${this.renderAmsSummary()}
     `;
+  }
+
+  private renderAmsPage(): TemplateResult {
+    if (this.config?.show_ams === false) {
+      return html`<div class="empty-state">
+        <strong>AMS is hidden</strong>
+        <span>Set <code>show_ams: true</code> in the card editor to show AMS units.</span>
+      </div>`;
+    }
+    const ams = this.renderAms();
+    return html`<div class="ams-page">
+      ${ams === nothing
+        ? html`<div class="empty-state">
+            <strong>No AMS detected</strong>
+            <span
+              >This printer has not reported an AMS unit. Loaded external spools
+              would appear here.</span
+            >
+          </div>`
+        : ams}
+      <p class="hint">
+        Tap a tray for its Home Assistant entity details. Remaining filament is
+        reported by the AMS; a 0% estimate is not the same as an empty tray.
+      </p>
+    </div>`;
   }
 
   private renderSetup(
@@ -1390,18 +1483,31 @@ export class BambuPrinterCard extends LitElement {
                 : html`<span>${eta}</span>`}
             </div>
           </div>
-          <div class="hero-art" aria-hidden="true">
-            ${cover && !this.imageFailed
-              ? html`<img
+          ${cover && !this.imageFailed
+            ? html`<button
+                class="hero-art"
+                type="button"
+                title="Open print preview"
+                aria-label="Open print preview"
+                aria-haspopup="dialog"
+                @click=${(event: MouseEvent) =>
+                  this.openDialog("preview", event.currentTarget as HTMLElement)}
+              >
+                <img
                   src=${cover}
                   alt=""
                   loading="lazy"
                   @error=${() => {
                     this.imageFailed = true;
                   }}
-                />`
-              : html`<ha-icon icon="mdi:printer-3d-nozzle-outline"></ha-icon>`}
-          </div>
+                />
+                <span class="hero-art-expand" aria-hidden="true">
+                  <ha-icon icon="mdi:arrow-expand" aria-hidden="true"></ha-icon>
+                </span>
+              </button>`
+            : html`<div class="hero-art" aria-hidden="true">
+                <ha-icon icon="mdi:printer-3d-nozzle-outline"></ha-icon>
+              </div>`}
         </div>
         <div class="cost-panel">
           <button
@@ -1447,8 +1553,11 @@ export class BambuPrinterCard extends LitElement {
       typeof camera.attributes?.entity_picture === "string"
         ? camera.attributes.entity_picture
         : "";
+    const webRtc = this.cameraUsesWebRtc;
     const live =
       this.cameraLive && this.cameraReady && available(camera);
+    const loading =
+      this.cameraLive && !this.cameraReady && available(camera);
     return html`<section
       class="camera-tile family-surface"
       aria-label="Printer camera"
@@ -1457,12 +1566,21 @@ export class BambuPrinterCard extends LitElement {
         this.cameraFrameEl = el as HTMLElement | undefined;
       })}>
         ${live
-          ? html`<ha-camera-stream
-              .hass=${this.hass}
-              .stateObj=${camera}
-              .controls=${false}
-              .muted=${true}
-            ></ha-camera-stream>`
+          ? webRtc
+            ? html`<ha-web-rtc-player
+                .hass=${this.hass}
+                .entityid=${camera.entity_id}
+                .controls=${false}
+                .muted=${true}
+                autoplay
+                playsinline
+              ></ha-web-rtc-player>`
+            : html`<ha-camera-stream
+                .hass=${this.hass}
+                .stateObj=${camera}
+                .controls=${false}
+                .muted=${true}
+              ></ha-camera-stream>`
           : picture
             ? html`<img
                 class="camera-image"
@@ -1472,8 +1590,13 @@ export class BambuPrinterCard extends LitElement {
             : nothing}
         ${!live && !picture
           ? html`<div class="camera-placeholder">
-              <ha-icon icon="mdi:camera-off-outline" aria-hidden="true"></ha-icon>
-              <span>Camera unavailable</span>
+              <ha-icon
+                .icon=${loading
+                  ? "mdi:camera-outline"
+                  : "mdi:camera-off-outline"}
+                aria-hidden="true"
+              ></ha-icon>
+              <span>${loading ? "Loading camera…" : "Camera unavailable"}</span>
             </div>`
           : nothing}
         <div class="camera-overlay">
@@ -1524,16 +1647,9 @@ export class BambuPrinterCard extends LitElement {
     unit: string,
     sub: string,
     unavailable = false,
+    entityId?: string | null,
   ): TemplateResult {
-    return html`<button
-      class="metric family-metric family-surface"
-      type="button"
-      aria-haspopup="dialog"
-      aria-label=${`${label}: ${value} ${unit}. Open printer details`}
-      @click=${(event: MouseEvent) =>
-        this.openDialog("details", event.currentTarget as HTMLElement)}
-    >
-      <span class="metric-head"
+    const content = html`<span class="metric-head"
         ><ha-icon .icon=${icon} aria-hidden="true"></ha-icon
         ><span>${label}</span></span
       >
@@ -1542,8 +1658,25 @@ export class BambuPrinterCard extends LitElement {
           ? html`<small>${unit}</small>`
           : nothing}</span
       >
-      <span class="metric-sub">${sub}</span>
-    </button>`;
+      <span class="metric-sub">${sub}</span>`;
+    const interactive = !!entityId && !!this.hass?.states[entityId];
+    return interactive
+      ? html`<button
+          class="metric family-metric family-surface"
+          type="button"
+          data-metric=${label.toLowerCase()}
+          aria-haspopup="dialog"
+          aria-label=${`${label}: ${unavailable ? "unavailable" : `${value} ${unit}`}. Open entity details`}
+          @click=${() => this.moreInfo(entityId)}
+        >
+          ${content}
+        </button>`
+      : html`<div
+          class="metric family-metric family-surface"
+          data-metric=${label.toLowerCase()}
+        >
+          ${content}
+        </div>`;
   }
 
   private temperatureMetric(
@@ -1568,6 +1701,7 @@ export class BambuPrinterCard extends LitElement {
           ? `Target ${formatNumber(target, digits, this.formatContext)} ${unitOf(targetEntity) || unit}`
           : "No target",
       unavailable,
+      valueEntity?.entity_id,
     );
   }
 
@@ -1620,6 +1754,7 @@ export class BambuPrinterCard extends LitElement {
               ? "Printing load"
               : "Printer load",
           power === null,
+          printer.power.entity_id,
         ),
       );
     } else if (printer.price) {
@@ -1630,48 +1765,93 @@ export class BambuPrinterCard extends LitElement {
           "mdi:currency-eur",
           price === null ? "—" : formatPrice(price, this.formatContext),
           price === null ? "" : this.priceUnit,
-          "Real Electricity Price",
+          "Electricity price",
           price === null,
+          printer.price.entity_id,
         ),
       );
     }
     return html`<div class="metrics family-metrics">${metrics}</div>`;
   }
 
+  private telemetryCell(
+    key: string,
+    label: string,
+    value: string,
+    options: { entityId?: string | null; onClick?: () => void } = {},
+  ): TemplateResult {
+    const content = html`<span class="telemetry-label">${label}</span>
+      <span class="telemetry-value">${value}</span>`;
+    if (options.entityId && this.hass?.states[options.entityId]) {
+      return html`<button
+        class="telemetry-cell"
+        type="button"
+        data-telemetry=${key}
+        aria-haspopup="dialog"
+        aria-label=${`${label}: ${value}. Open entity details`}
+        @click=${() => this.moreInfo(options.entityId)}
+      >
+        ${content}
+      </button>`;
+    }
+    if (options.onClick) {
+      return html`<button
+        class="telemetry-cell"
+        type="button"
+        data-telemetry=${key}
+        aria-haspopup="dialog"
+        aria-label=${`${label}: ${value}. Open print history`}
+        @click=${options.onClick}
+      >
+        ${content}
+      </button>`;
+    }
+    return html`<div class="telemetry-cell" data-telemetry=${key}>${content}</div>`;
+  }
+
   private renderTelemetry(): TemplateResult | typeof nothing {
     const printer = this.printer as PrinterEntities;
     const cells: TemplateResult[] = [];
-    const current = currentAmps(printer.current);
     if (printer.current) {
-      cells.push(html`<div class="telemetry-cell">
-        <span class="telemetry-label">Current</span>
-        <span class="telemetry-value">${formatCurrent(current)}</span>
-      </div>`);
+      cells.push(
+        this.telemetryCell(
+          "current",
+          "Current",
+          formatCurrent(currentAmps(printer.current)),
+          { entityId: printer.current.entity_id },
+        ),
+      );
     }
-    const voltage = asNumber(printer.voltage?.state);
     if (printer.voltage) {
-      cells.push(html`<div class="telemetry-cell">
-        <span class="telemetry-label">Voltage</span>
-        <span class="telemetry-value">${formatVoltage(voltage)}</span>
-      </div>`);
+      cells.push(
+        this.telemetryCell(
+          "voltage",
+          "Voltage",
+          formatVoltage(asNumber(printer.voltage.state)),
+          { entityId: printer.voltage.entity_id },
+        ),
+      );
     }
     if (printer.price) {
-      const price = pricePerKwh(printer.price);
-      cells.push(html`<div class="telemetry-cell">
-        <span class="telemetry-label">Electricity price</span>
-        <span class="telemetry-value"
-          >${formatPrice(price, this.formatContext)} ${this.priceUnit}</span
-        >
-      </div>`);
+      cells.push(
+        this.telemetryCell(
+          "price",
+          "Electricity price",
+          `${formatPrice(pricePerKwh(printer.price), this.formatContext)} ${this.priceUnit}`,
+          { entityId: printer.price.entity_id },
+        ),
+      );
     }
     const quote = this.currentQuote();
     if (quote) {
-      cells.push(html`<div class="telemetry-cell">
-        <span class="telemetry-label"
-          >${isActiveStatus(this.status) ? "Energy · this print" : "Energy · last print"}</span
-        >
-        <span class="telemetry-value">${formatEnergy(quote.energy)}</span>
-      </div>`);
+      cells.push(
+        this.telemetryCell(
+          "energy",
+          isActiveStatus(this.status) ? "Energy · this print" : "Energy · last print",
+          formatEnergy(quote.energy),
+          { onClick: () => this.openDialog("history") },
+        ),
+      );
     }
     if (!cells.length) return nothing;
     return html`<div class="telemetry family-surface">${cells}</div>`;
@@ -1791,6 +1971,134 @@ export class BambuPrinterCard extends LitElement {
       empty: tray.empty,
       active: tray.active,
     });
+  }
+
+  private amsSummaryTile(unit: AmsUnit): TemplateResult {
+    const focus =
+      unit.trays.find((tray) => tray.active) ??
+      [...unit.trays]
+        .filter((tray) => !tray.empty)
+        .sort((a, b) => (b.remain ?? -1) - (a.remain ?? -1))[0] ??
+      null;
+    const loaded = unit.trays.filter((tray) => !tray.empty).length;
+    const environment = [
+      unit.temperature
+        ? formatTemperature(entityNumber(unit.temperature))
+        : null,
+      unit.humidity ? formatPercent(entityNumber(unit.humidity)) : null,
+    ]
+      .filter((value): value is string => !!value)
+      .join(" · ");
+    const remain =
+      focus && focus.remainEnabled && focus.remain !== null
+        ? `${formatNumber(focus.remain, 0)}%`
+        : null;
+    const meta = focus
+      ? [focus.type || null, remain, focus.active ? "Active" : null]
+          .filter((value): value is string => !!value)
+          .join(" · ")
+      : "No active tray";
+    return html`<button
+      class="ams-summary-tile family-surface"
+      type="button"
+      aria-label=${`Open ${unit.label} details`}
+      @click=${() => this.showPage("ams")}
+    >
+      <span class="ams-summary-head">
+        <span class="ams-name">${unit.label}</span>
+        ${unit.active
+          ? html`<span class="ams-state"
+              ><span class="status-dot" aria-hidden="true"></span>Active</span
+            >`
+          : nothing}
+        ${environment ? html`<span class="ams-env">${environment}</span>` : nothing}
+      </span>
+      <span class="ams-summary-tray">
+        <span
+          class="tray-swatch ${focus?.colors.length ? "" : "none"}"
+          style=${swatchStyle(focus?.colors ?? [])}
+          aria-hidden="true"
+        ></span>
+        <span class="ams-summary-copy">
+          <strong>${focus ? focus.name : "No filament loaded"}</strong>
+          <small>${meta}</small>
+        </span>
+      </span>
+      <span class="ams-summary-dots" aria-hidden="true">
+        ${unit.trays.map(
+          (tray) => html`<span
+            class="ams-dot ${tray.active ? "active" : ""} ${tray.empty
+              ? "empty"
+              : ""} ${tray.colors.length ? "" : "none"}"
+            style=${swatchStyle(tray.colors)}
+            title=${tray.name}
+          ></span>`,
+        )}
+        <span class="ams-summary-loaded">${loaded}/${unit.trays.length} loaded</span>
+      </span>
+    </button>`;
+  }
+
+  private externalSummaryTile(spools: ExternalSpool[]): TemplateResult {
+    const focus =
+      spools.find((spool) => spool.active) ??
+      [...spools]
+        .filter((spool) => !spool.empty)
+        .sort((a, b) => (b.remain ?? -1) - (a.remain ?? -1))[0] ??
+      spools[0];
+    const loaded = spools.filter((spool) => !spool.empty).length;
+    return html`<button
+      class="ams-summary-tile family-surface"
+      type="button"
+      aria-label="Open external spool details"
+      @click=${() => this.showPage("ams")}
+    >
+      <span class="ams-summary-head">
+        <span class="ams-name">External</span>
+        ${focus?.active
+          ? html`<span class="ams-state"
+              ><span class="status-dot" aria-hidden="true"></span>Active</span
+            >`
+          : nothing}
+        <span class="ams-env">${loaded}/${spools.length} loaded</span>
+      </span>
+      <span class="ams-summary-tray">
+        <span
+          class="tray-swatch ${focus?.colors.length ? "" : "none"}"
+          style=${swatchStyle(focus?.colors ?? [])}
+          aria-hidden="true"
+        ></span>
+        <span class="ams-summary-copy">
+          <strong>${focus && !focus.empty ? focus.name : "No filament loaded"}</strong>
+          <small>${focus && !focus.empty ? [focus.type, focus.remain].filter(Boolean).join(" · ") : "External spool"}</small>
+        </span>
+      </span>
+    </button>`;
+  }
+
+  private renderAmsSummary(): TemplateResult | typeof nothing {
+    if (!this.config?.show_ams || !this.printer) return nothing;
+    const units = this.printer.ams;
+    const external = this.printer.external.filter(
+      (spool) => !spool.empty || spool.active,
+    );
+    if (!units.length && !external.length) return nothing;
+    return html`<section class="ams-summary">
+      <div class="section-title">
+        <h2>AMS</h2>
+        <button
+          class="ams-all"
+          type="button"
+          @click=${() => this.showPage("ams")}
+        >
+          All trays<ha-icon .icon=${UI_ICONS.next} aria-hidden="true"></ha-icon>
+        </button>
+      </div>
+      <div class="ams-summary-grid">
+        ${units.map((unit) => this.amsSummaryTile(unit))}
+        ${external.length ? this.externalSummaryTile(external) : nothing}
+      </div>
+    </section>`;
   }
 
   private renderAms(): TemplateResult | typeof nothing {
@@ -1937,6 +2245,29 @@ export class BambuPrinterCard extends LitElement {
       <h3>${title}</h3>
       <div class="rows">${content}</div>
     </section>`;
+  }
+
+  private renderPreview(): TemplateResult {
+    const cover = this.coverUrl();
+    const task = this.printer?.task?.state;
+    return html`<div class="preview-dialog">
+      ${cover && !this.imageFailed
+        ? html`<img
+            class="preview-large"
+            src=${cover}
+            alt="Print preview"
+            @error=${() => {
+              this.imageFailed = true;
+            }}
+          />`
+        : html`<div class="empty-state">
+            <strong>Print preview unavailable</strong>
+            <span>The Bambu cover image is not available for this print.</span>
+          </div>`}
+      <p class="preview-caption">
+        ${task ? `${task} · ` : ""}Reported by the Bambu Lab cover image entity.
+      </p>
+    </div>`;
   }
 
   private renderDetails(): TemplateResult {

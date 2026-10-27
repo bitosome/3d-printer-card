@@ -114,10 +114,55 @@ check(
 check(
   "camera tile renders the stream/snapshot surface",
   !!root?.querySelector(".camera-tile") &&
-    !!root?.querySelector(".camera-frame"),
+    !!root?.querySelector(".camera-frame") &&
+    !!root?.querySelector(".camera-frame ha-camera-stream"),
 );
 check(
-  "two AMS units and eight trays render",
+  "camera tile can switch between live and snapshot",
+  root?.querySelectorAll(".camera-actions button").length === 2,
+);
+root?.querySelector(".camera-actions button:first-child")?.click();
+await tick(60);
+check(
+  "snapshot mode replaces the live element without leaving the card",
+  !!root?.querySelector(".camera-frame img.camera-image") &&
+    !root?.querySelector(".camera-frame ha-camera-stream"),
+);
+root?.querySelector(".camera-actions button:first-child")?.click();
+await tick(60);
+check(
+  "live mode restores the camera stream element",
+  !!root?.querySelector(".camera-frame ha-camera-stream"),
+);
+
+const moreInfoEvents = [];
+card.addEventListener("hass-more-info", (event) => {
+  moreInfoEvents.push(event.detail?.entityId);
+});
+root?.querySelector('[data-metric="chamber"]')?.click();
+await tick(60);
+check(
+  "a temperature tile opens native entity details, not the full card dialog",
+  moreInfoEvents.includes("sensor.h2d_demo_chamber_temperature") &&
+    !root?.querySelector("dialog.family-dialog"),
+);
+root?.querySelector('[data-telemetry="current"]')?.click();
+await tick(40);
+check(
+  "telemetry cells open their own entity details",
+  moreInfoEvents.includes("sensor.demo_printer_current"),
+);
+
+check(
+  "overview shows a compact AMS summary, not eight full trays",
+  root?.querySelectorAll(".ams-summary-tile").length === 2 &&
+    !root?.querySelector(".ams-card") &&
+    text(root?.querySelector(".ams-summary-tile")).includes("Bambu PLA Basic"),
+);
+root?.querySelector(".ams-summary-tile")?.click();
+await tick(100);
+check(
+  "the AMS page shows both units and all eight trays",
   root?.querySelectorAll(".ams-card").length === 2 &&
     root?.querySelectorAll(".tray").length === 8,
 );
@@ -127,6 +172,37 @@ check(
     text(root?.querySelector(".tray.active")).includes("Active") &&
     text(root?.querySelector(".tray.active")).includes("97%"),
 );
+root?.querySelector('[data-nav="overview"]')?.click();
+await tick(80);
+check(
+  "the bottom navigation returns to the overview",
+  !!root?.querySelector(".metrics") &&
+    !root?.querySelector(".ams-card") &&
+    root?.querySelector('[data-nav="overview"]')?.getAttribute("aria-current") ===
+      "page",
+);
+
+check(
+  "bottom navigation exposes overview, AMS, history and details",
+  root?.querySelectorAll("[data-nav]").length === 4 &&
+    text(root?.querySelector('[data-nav="ams"]')).includes("AMS") &&
+    text(root?.querySelector('[data-nav="history"]')).includes("History") &&
+    text(root?.querySelector('[data-nav="details"]')).includes("Details"),
+);
+
+// Clickable model preview ------------------------------------------------
+root?.querySelector("button.hero-art")?.click();
+await tick(100);
+let previewDialog = root?.querySelector("dialog.family-dialog");
+check(
+  "the print preview opens a full image dialog",
+  !!previewDialog &&
+    previewDialog.open === true &&
+    text(previewDialog).includes("Print preview") &&
+    !!previewDialog.querySelector("img.preview-large"),
+);
+previewDialog?.querySelector(".family-icon-button[title='Close']")?.click();
+await tick(80);
 const costText = text(root?.querySelector(".cost-value"));
 check(
   "current print cost is estimated from recorder power",
@@ -172,7 +248,7 @@ await tick(100);
 check("history dialog closes", !root?.querySelector("dialog.family-dialog"));
 
 // Details dialog -----------------------------------------------------------
-root?.querySelector(".header-actions .family-icon-button:last-child")?.click();
+root?.querySelector('[data-nav="details"]')?.click();
 await tick(500);
 dialog = root?.querySelector("dialog.family-dialog");
 const detailsText = text(dialog);

@@ -15,23 +15,30 @@ printer was contacted.</sub>
 ## What you get
 
 - **Printing now / last print** — task name, progress, ETA, layers, filament
-  weight and length, speed profile and the current print's cover image.
-- **Live camera** — Home Assistant's camera stream with a fullscreen control and
-  a still-image fallback when a stream is unavailable.
+  weight and length, speed profile and the current print's cover image. Tap the
+  cover image for a full print preview.
+- **Live camera** — the same Home Assistant camera/WebRTC elements used by the
+  custom camera card, with a fullscreen control, a loading state, a still-image
+  fallback and a live/snapshot toggle.
 - **Print cost** — current or last print electricity estimate, energy used and
   weighted average tariff. Tap it for the full print history.
 - **Print history** — per-print cost and energy, total and average cost for the
   selected Recorder window, and a 24-hour power/current chart with the same
   data the old ApexCharts card showed. Each record expands to show its start,
   end, average tariff, unpriced energy and partial-estimate reasons.
-- **AMS** — every AMS unit discovered from the Bambu entity prefix: four trays
-  per unit with filament colour, material, remaining percentage, active tray,
-  unit temperature/humidity and drying state. Loaded external spools appear
+- **AMS** — a compact AMS summary on the overview (active tray, remaining
+  filament, colours, loaded count) and a dedicated AMS page with every unit and
+  tray: colour, material, remaining percentage, active tray, unit
+  temperature/humidity and drying state. Loaded external spools appear
   automatically.
 - **Telemetry** — bed, nozzle and chamber temperatures with targets; smart-plug
-  power, current and voltage; electricity price and print energy.
+  power, current and voltage; electricity price and print energy. Each tile
+  opens its native Home Assistant entity details.
 - **Notices** — HMS messages, print errors, offline/unavailable telemetry and an
   open enclosure door while printing.
+- **Bottom navigation** — Overview, AMS, History and Details, matching the heat
+  pump card's navigation pattern. History and Details open the shared modal
+  flow; the print history has per-print records and the 24-hour chart.
 - **Details** — a read-only dialog with print job, temperatures, fans, power and
   cost, machine, AMS and HMS data. Rows open Home Assistant's native more-info.
 - **Responsive and theme-aware** — one column on phones, two AMS cards side by
@@ -62,7 +69,7 @@ This is a **Dashboard** repository, not an entry in the default HACS catalog.
 1. Download `bambu-printer-card.js` from a release, or use
    `dist/bambu-printer-card.js` from the repository.
 2. Put it in `/config/www/community/3d-printer-card/bambu-printer-card.js`.
-3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.1.0` as a dashboard
+3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.0` as a dashboard
    resource of type **JavaScript module**.
 4. Reload the frontend and add the card.
 
@@ -190,13 +197,21 @@ The card composes the shared `@bitosome/ha-card-ui` tokens, family surfaces,
 metric grid, notices, glow helpers and native dialog flow. It follows the same
 rules as the other bitosome cards:
 
-- main readings stay on the card; substantial history and details open in the
-  common modal flow;
+- main readings stay on the card; metric and telemetry tiles open Home
+  Assistant's native entity more-info, while substantial history and details
+  open from the common bottom navigation modal flow;
 - a telemetry update never resets focus, scroll or an expanded history record;
 - the activation glow sits under the common tile group, not on each tile;
 - controls are buttons with visible focus and at least a 44px tap target;
+- the AMS summary opens the dedicated AMS page, and the model preview opens a
+  full image dialog;
 - the card is contained by `overflow: clip`, so its glow cannot paint over
   neighbouring dashboard cards.
+
+![AMS page and bottom navigation](docs/preview-ams.jpg)
+
+The bottom navigation mirrors the heat pump card: **Overview** and **AMS** are
+inline pages, while **History** and **Details** open the shared modal flow.
 
 ![Print history dialog](docs/preview-history.jpg)
 
