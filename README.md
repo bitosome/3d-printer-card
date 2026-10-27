@@ -180,7 +180,7 @@ The tariff sensor is used as recorded. If that sensor already includes fees and
 VAT, the card adds nothing; if it does not, neither does the card. Electricity
 cost does not include filament, depreciation or failed-print material.
 
-The history list is built from the same Recorder data. A sector that started
+The history list is built from the same Recorder data. A session that started
 before the Recorder window is marked partial. The chart always shows the last
 24 hours; the summary and session list use the configured `history_days` window.
 
