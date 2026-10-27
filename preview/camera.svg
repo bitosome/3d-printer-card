@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141b27"/>
+      <stop offset="1" stop-color="#080a0e"/>
+    </linearGradient>
+    <linearGradient id="bed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f3b4d"/>
+      <stop offset="1" stop-color="#171e28"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+      <stop offset="0" stop-color="#ffcf57" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ffcf57" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="print" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a65"/>
+      <stop offset="1" stop-color="#e64a19"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky)"/>
+  <g opacity=".18" stroke="#9fb4d1" stroke-width="1">
+    <path d="M0 300h640M0 240h640M0 180h640M0 120h640M0 60h640"/>
+    <path d="M80 0v360M160 0v360M240 0v360M320 0v360M400 0v360M480 0v360M560 0v360"/>
+  </g>
+  <ellipse cx="320" cy="296" rx="214" ry="48" fill="#000" opacity=".45"/>
+  <path d="M110 252h420l46 62H64z" fill="url(#bed)"/>
+  <path d="M110 252h420l46 62H64z" fill="none" stroke="#4b5d76" stroke-width="2"/>
+  <path d="M160 260h96l-14 24h-96z" fill="#2a3342" stroke="#53647d" stroke-width="1"/>
+  <path d="M270 260h190l-20 24H270z" fill="#2a3342" stroke="#53647d" stroke-width="1"/>
+  <ellipse cx="320" cy="262" rx="126" ry="26" fill="url(#glow)"/>
+  <g>
+    <path d="M234 262l24-52h124l24 52z" fill="url(#print)" opacity=".95"/>
+    <path d="M258 210h124l8 18H250z" fill="#ffab91" opacity=".85"/>
+    <path d="M264 228h110l5 12H259z" fill="#d84315" opacity=".8"/>
+    <path d="M270 244h96l4 8h-104z" fill="#bf360c" opacity=".75"/>
+    <path d="M300 176h40l8 34h-56z" fill="#ffb74d" opacity=".9"/>
+  </g>
+  <g stroke="#b0bec5" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M96 66h448"/>
+    <path d="M150 66v70M490 66v70"/>
+    <path d="M320 66v54"/>
+  </g>
+  <rect x="300" y="118" width="40" height="24" rx="5" fill="#37474f" stroke="#90a4ae" stroke-width="2"/>
+  <path d="M320 142v18" stroke="#ffd54f" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="320" cy="164" r="5" fill="#ffcf57"/>
+  <circle cx="320" cy="164" r="16" fill="#ffcf57" opacity=".16"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#8ba0bb">
+    <text x="18" y="26" font-size="11" letter-spacing="2">SYNTHETIC CAMERA PREVIEW</text>
+    <text x="18" y="342" font-size="10" opacity=".65">CAM 01 · 192.0.2.10 · PREVIEW ONLY</text>
+    <text x="622" y="342" font-size="10" text-anchor="end" opacity=".65">00:42:17</text>
+  </g>
+  <circle cx="600" cy="24" r="4" fill="#e53935"/>
+  <text x="590" y="28" font-family="ui-monospace, monospace" font-size="10" fill="#e57373" text-anchor="end">REC</text>
+</svg>

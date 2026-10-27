@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2634"/>
+      <stop offset="1" stop-color="#0a0e14"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8ce1ff"/>
+      <stop offset="1" stop-color="#1e88e5"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1976d2"/>
+      <stop offset="1" stop-color="#0d47a1"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1565c0"/>
+      <stop offset="1" stop-color="#082f6b"/>
+    </linearGradient>
+    <linearGradient id="slot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05101c"/>
+      <stop offset="1" stop-color="#0b1a2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" fill="url(#bg)"/>
+  <circle cx="160" cy="150" r="118" fill="#42a5f5" opacity=".10"/>
+  <ellipse cx="160" cy="268" rx="106" ry="20" fill="#000" opacity=".42"/>
+  <g>
+    <!-- isometric desk organizer tray -->
+    <path d="M62 176l98-46 98 46-98 48z" fill="url(#top)"/>
+    <path d="M62 176v40l98 48v-40z" fill="url(#left)"/>
+    <path d="M258 176v40l-98 48v-40z" fill="url(#right)"/>
+    <!-- phone stand slot at the back -->
+    <path d="M118 160l42-20 42 20-42 20z" fill="url(#slot)"/>
+    <path d="M118 160v18l42 20v-18z" fill="#071523" opacity=".9"/>
+    <path d="M202 160v18l-42 20v-18z" fill="#071523" opacity=".75"/>
+    <!-- three compartments -->
+    <path d="M82 186l34-16 34 16-34 17z" fill="#0b1a2b" opacity=".72"/>
+    <path d="M82 186v16l34 17v-16z" fill="#061321" opacity=".8"/>
+    <path d="M150 186v16l-34 17v-16z" fill="#0a1d31" opacity=".7"/>
+    <path d="M156 186l34-16 34 16-34 17z" fill="#0b1a2b" opacity=".72"/>
+    <path d="M156 186v16l34 17v-16z" fill="#061321" opacity=".8"/>
+    <path d="M224 186v16l-34 17v-16z" fill="#0a1d31" opacity=".7"/>
+    <path d="M119 201l34-16 34 16-34 17z" fill="#0b1a2b" opacity=".6"/>
+    <path d="M119 201v14l34 17v-14z" fill="#061321" opacity=".7"/>
+    <path d="M187 201v14l-34 17v-14z" fill="#0a1d31" opacity=".6"/>
+    <!-- pens / tools -->
+    <g stroke-linecap="round" stroke-width="5">
+      <path d="M128 158v-32" stroke="#ffcf57"/>
+      <path d="M142 152v-38" stroke="#ff8a65"/>
+      <path d="M156 148v-30" stroke="#81d4fa"/>
+    </g>
+    <!-- layer lines on the front -->
+    <g stroke="#8ce1ff" stroke-width="1" opacity=".28">
+      <path d="M72 186l88 43M72 192l88 43M72 198l88 43M72 204l88 43"/>
+    </g>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#90caf9" opacity=".8">
+    <text x="20" y="300" font-size="10" letter-spacing="2">DESK ORGANIZER</text>
+    <text x="300" y="300" font-size="10" text-anchor="end">PREVIEW</text>
+  </g>
+</svg>

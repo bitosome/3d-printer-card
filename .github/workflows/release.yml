@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Verify release version and bundle
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync, statSync } from 'node:fs';
+          const json = (path) => JSON.parse(readFileSync(path, 'utf8'));
+          assert.equal(process.env.GITHUB_REF_NAME, `v${json('package.json').version}`);
+          assert.equal(json('hacs.json').filename, 'bambu-printer-card.js');
+          assert.ok(statSync('dist/bambu-printer-card.js').size > 0);
+          NODE
+      - name: Check committed bundle matches source
+        run: git diff --exit-code -- dist/bambu-printer-card.js
+      - name: Publish tested bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/bambu-printer-card.js --generate-notes --verify-tag

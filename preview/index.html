@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bambu Lab Printer Card — synthetic preview</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css"
+    />
+    <style>
+      :root {
+        --primary-text-color: #1b1c1e;
+        --secondary-text-color: #6e7178;
+        --card-background-color: #f4f4f5;
+        --ha-card-background: #f4f4f5;
+        --primary-color: #3b82f6;
+        --divider-color: rgba(0, 0, 0, 0.08);
+        --ha-card-border-radius: 24px;
+        --ha-font-family-body: "Inter", ui-sans-serif, system-ui, -apple-system,
+          "Segoe UI", Roboto, sans-serif;
+        --error-color: #b3261e;
+        --warning-color: #a86600;
+        --success-color: #2e7d32;
+        --switch-on-color: #ffc107;
+        --page-bg: #e7e8ea;
+        --caption: #6e7178;
+        --preview-width: 420px;
+        color-scheme: light;
+      }
+      [data-theme="dark"] {
+        --primary-text-color: #f1f1f1;
+        --secondary-text-color: #a3a6ad;
+        --card-background-color: #1c1d20;
+        --ha-card-background: #1c1d20;
+        --primary-color: #8ab4ff;
+        --divider-color: rgba(255, 255, 255, 0.1);
+        --error-color: #f2b8b5;
+        --warning-color: #ffb74d;
+        --success-color: #81c784;
+        --page-bg: #0e0f12;
+        --caption: #9a9da4;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 18px 12px 28px;
+        background: var(--page-bg);
+        color: var(--primary-text-color);
+        font-family: var(--ha-font-family-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      body.no-chrome {
+        padding: 0;
+        gap: 0;
+        background: var(--ha-card-background);
+      }
+      .preview-bar {
+        width: min(100%, 820px);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 0 2px;
+      }
+      .preview-bar strong {
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.01em;
+      }
+      .preview-bar small {
+        display: block;
+        margin-top: 2px;
+        color: var(--caption);
+        font-size: 11px;
+      }
+      .preview-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .preview-actions a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 6px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--divider-color);
+        color: var(--primary-text-color);
+        background: var(--ha-card-background);
+        font-size: 11px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .preview-actions a[aria-current="true"] {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+      }
+      .card-shell {
+        width: min(100%, var(--preview-width));
+        min-width: 0;
+      }
+      body.no-chrome .card-shell {
+        width: min(100%, var(--preview-width));
+        max-width: none;
+      }
+      .caption {
+        width: min(100%, var(--preview-width));
+        margin: 0;
+        color: var(--caption);
+        font-size: 10.5px;
+        line-height: 1.5;
+        text-align: center;
+      }
+      body.no-chrome .caption,
+      body.no-chrome .preview-bar {
+        display: none;
+      }
+      ha-card {
+        display: block;
+      }
+      ha-icon i {
+        font-size: var(--mdc-icon-size, 22px);
+        line-height: 1;
+      }
+      ha-camera-stream {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #080a0e;
+      }
+      ha-camera-stream img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview-bar">
+      <div>
+        <strong>Bambu Lab Printer Card</strong>
+        <small>Synthetic state and synthetic camera. No printer is contacted.</small>
+      </div>
+      <div class="preview-actions" id="actions"></div>
+    </div>
+    <main class="card-shell" id="card-shell"></main>
+    <p class="caption">
+      Preview only · all readings, history and images are fictional · no printer
+      commands are sent
+    </p>
+    <pre id="preview-error" hidden style="max-width:820px;white-space:pre-wrap;color:#b3261e;background:#fff;padding:12px;border-radius:8px;font-size:11px"></pre>
+    <script>
+      const showPreviewError = (message) => {
+        if (String(message).includes("ResizeObserver loop")) return;
+        const node = document.getElementById("preview-error");
+        if (!node) return;
+        node.hidden = false;
+        node.textContent += `${message}\n`;
+      };
+      window.addEventListener("error", (event) =>
+        showPreviewError(`${event.message} @ ${event.filename}:${event.lineno}\n${event.error?.stack || ""}`),
+      );
+      window.addEventListener("unhandledrejection", (event) =>
+        showPreviewError(`Promise rejection: ${event.reason?.stack || event.reason}`),
+      );
+    </script>
+    <script type="module">
+      class HaCard extends HTMLElement {
+        connectedCallback() {
+          if (!this.shadowRoot) {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              "<style>:host{display:block}</style><slot></slot>";
+          }
+        }
+      }
+      class HaIcon extends HTMLElement {
+        static get observedAttributes() {
+          return ["icon"];
+        }
+        set icon(value) {
+          this.setAttribute("icon", value || "");
+        }
+        get icon() {
+          return this.getAttribute("icon") || "";
+        }
+        connectedCallback() {
+          this.ensureRoot();
+          this.renderIcon();
+        }
+        attributeChangedCallback() {
+          if (this.shadowRoot) this.renderIcon();
+        }
+        ensureRoot() {
+          if (this.shadowRoot) return;
+          const root = this.attachShadow({ mode: "open" });
+          root.innerHTML = `<style>
+            @import url("https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css");
+            :host { display: inline-flex; width: var(--mdc-icon-size, 22px); height: var(--mdc-icon-size, 22px); }
+            i { display: block; font-size: var(--mdc-icon-size, 22px); line-height: 1; }
+          </style><i></i>`;
+        }
+        renderIcon() {
+          const node = this.shadowRoot?.querySelector("i");
+          if (!node) return;
+          const name = (this.getAttribute("icon") || "").replace(/^mdi:/, "");
+          node.className = name ? `mdi mdi-${name}` : "";
+        }
+      }
+      class HaCameraStream extends HTMLElement {
+        connectedCallback() {
+          if (this.shadowRoot) return;
+          const root = this.attachShadow({ mode: "open" });
+          root.innerHTML =
+            '<style>:host{display:block;width:100%;height:100%}img{display:block;width:100%;height:100%;object-fit:cover}</style><img src="/preview/camera.svg" alt="" />';
+        }
+      }
+      if (!customElements.get("ha-card")) customElements.define("ha-card", HaCard);
+      if (!customElements.get("ha-icon")) customElements.define("ha-icon", HaIcon);
+      if (!customElements.get("ha-camera-stream"))
+        customElements.define("ha-camera-stream", HaCameraStream);
+
+      window.loadCardHelpers = async () => ({
+        async createCardElement() {
+          return document.createElement("ha-camera-stream");
+        },
+      });
+
+      const params = new URLSearchParams(location.search);
+      const theme = params.get("theme") === "dark" ? "dark" : "light";
+      const width = Math.max(300, Number(params.get("width")) || 420);
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.setProperty("--preview-width", `${width}px`);
+      if (params.get("chrome") === "0") document.body.classList.add("no-chrome");
+
+      const actions = document.getElementById("actions");
+      const makeLink = (label, query, active) => {
+        const link = document.createElement("a");
+        link.textContent = label;
+        link.href = `?${query}`;
+        link.setAttribute("aria-current", active ? "true" : "false");
+        actions.append(link);
+      };
+      const base = new URLSearchParams(params);
+      base.delete("dialog");
+      const chrome = params.get("chrome") === "0" ? "0" : "1";
+      const themeQuery = (next) => {
+        const value = new URLSearchParams(base);
+        value.set("theme", next);
+        value.set("chrome", chrome);
+        if (chrome === "0") value.delete("chrome");
+        return value.toString();
+      };
+      const widthQuery = (next) => {
+        const value = new URLSearchParams(base);
+        value.set("width", String(next));
+        value.set("theme", theme);
+        value.set("chrome", chrome);
+        if (chrome === "0") value.delete("chrome");
+        return value.toString();
+      };
+      const dialogQuery = (next) => {
+        const value = new URLSearchParams(base);
+        value.set("width", String(width));
+        value.set("theme", theme);
+        value.set("chrome", chrome);
+        if (next) value.set("dialog", next);
+        if (chrome === "0") value.delete("chrome");
+        return value.toString();
+      };
+      makeLink("Light", themeQuery("light"), theme === "light");
+      makeLink("Dark", themeQuery("dark"), theme === "dark");
+      makeLink("Mobile 320", widthQuery(320), width === 320);
+      makeLink("Mobile 420", widthQuery(420), width === 420);
+      makeLink("Desktop 760", widthQuery(760), width === 760);
+      makeLink("History", dialogQuery("history"), params.get("dialog") === "history");
+      makeLink("Details", dialogQuery("details"), params.get("dialog") === "details");
+
+      const { hass, cardConfig } = await import("./states.js");
+      await import("../dist/bambu-printer-card.js");
+      const card = document.createElement("bambu-printer-card");
+      card.setConfig(cardConfig);
+      document.getElementById("card-shell").append(card);
+      card.hass = hass;
+      await card.updateComplete;
+      await new Promise((resolve) => setTimeout(resolve, 650));
+
+      const dialog = params.get("dialog");
+      if (dialog === "history") {
+        card.shadowRoot?.querySelector(".cost-button")?.click();
+      } else if (dialog === "details") {
+        card.shadowRoot
+          ?.querySelector(".header-actions .family-icon-button:last-child")
+          ?.click();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      window.__previewReady = true;
+    </script>
+  </body>
+</html>
