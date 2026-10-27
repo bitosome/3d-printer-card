@@ -154,6 +154,7 @@ export class BambuPrinterCard extends LitElement {
   @state() private liveStart: number | null = null;
   @state() private liveReady = false;
   @state() private cameraReady = false;
+  @state() private cameraLive = true;
   @state() private imageFailed = false;
 
   private flow = new FamilyFlowController<DialogPage>(this);
@@ -193,6 +194,7 @@ export class BambuPrinterCard extends LitElement {
     this.lastCoverUrl = "";
     this.imageFailed = false;
     this.cameraLoadStarted = false;
+    this.cameraLive = true;
     this.clearFinishTimer();
     if (this.hass) this.handleHass();
     this.requestUpdate();
@@ -1445,10 +1447,11 @@ export class BambuPrinterCard extends LitElement {
       typeof camera.attributes?.entity_picture === "string"
         ? camera.attributes.entity_picture
         : "";
-    const live = this.cameraReady && available(camera);
+    const live =
+      this.cameraLive && this.cameraReady && available(camera);
     return html`<section
       class="camera-tile family-surface"
-      aria-label="Live printer camera"
+      aria-label="Printer camera"
     >
       <div class="camera-frame" ${ref((el) => {
         this.cameraFrameEl = el as HTMLElement | undefined;
@@ -1461,7 +1464,11 @@ export class BambuPrinterCard extends LitElement {
               .muted=${true}
             ></ha-camera-stream>`
           : picture
-            ? html`<img class="camera-image" src=${picture} alt="" />`
+            ? html`<img
+                class="camera-image"
+                src=${picture}
+                alt="Printer camera snapshot"
+              />`
             : nothing}
         ${!live && !picture
           ? html`<div class="camera-placeholder">
@@ -1474,16 +1481,37 @@ export class BambuPrinterCard extends LitElement {
             ? html`<span class="live-pill"
                 ><span class="status-dot" aria-hidden="true"></span>Live</span
               >`
-            : html`<span></span>`}
-          <button
-            class="camera-fullscreen"
-            type="button"
-            title="Full screen camera"
-            aria-label="Open camera full screen"
-            @click=${() => this.fullscreen()}
-          >
-            <ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon>
-          </button>
+            : picture
+              ? html`<span class="live-pill snapshot-pill">Snapshot</span>`
+              : html`<span></span>`}
+          <div class="camera-actions">
+            ${picture || live
+              ? html`<button
+                  class="camera-fullscreen"
+                  type="button"
+                  title=${live ? "Show camera snapshot" : "Show live stream"}
+                  aria-label=${live ? "Show camera snapshot" : "Show live camera stream"}
+                  aria-pressed=${String(!live)}
+                  @click=${() => {
+                    this.cameraLive = !this.cameraLive;
+                  }}
+                >
+                  <ha-icon
+                    .icon=${live ? "mdi:image-outline" : "mdi:video-outline"}
+                    aria-hidden="true"
+                  ></ha-icon>
+                </button>`
+              : nothing}
+            <button
+              class="camera-fullscreen"
+              type="button"
+              title="Full screen camera"
+              aria-label="Open camera full screen"
+              @click=${() => this.fullscreen()}
+            >
+              <ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon>
+            </button>
+          </div>
         </div>
       </div>
     </section>`;

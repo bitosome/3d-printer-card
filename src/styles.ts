@@ -489,11 +489,20 @@ export const cardStyles = [
     .live-pill .status-dot {
       background: var(--status-alert-color, #e53935);
     }
+    .snapshot-pill {
+      color: rgba(255, 255, 255, 0.86);
+      font-weight: 600;
+    }
+    .camera-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+    }
     .camera-fullscreen {
       pointer-events: auto;
       width: 44px;
       height: 44px;
-      margin: -4px -4px 0 0;
       border-radius: 50%;
       display: grid;
       place-items: center;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-10-27
+
+- The camera tile can now switch between the live stream and the camera
+  snapshot. Live remains the default; the snapshot is useful when the printer
+  RTSP stream or Home Assistant's stream worker is unstable.
+- Nothing is sent to the printer; switching only changes what the card renders.
+
 ## 0.1.0 — 2026-10-27
 
 - Initial release of the Bambu Lab printer card.
