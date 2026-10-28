@@ -69,7 +69,7 @@ This is a **Dashboard** repository, not an entry in the default HACS catalog.
 1. Download `bambu-printer-card.js` from a release, or use
    `dist/bambu-printer-card.js` from the repository.
 2. Put it in `/config/www/community/3d-printer-card/bambu-printer-card.js`.
-3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.3` as a dashboard
+3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.3.0` as a dashboard
    resource of type **JavaScript module**.
 4. Reload the frontend and add the card.
 
@@ -160,6 +160,18 @@ The card reads the following from `sensor.<prefix>_*`, `binary_sensor.<prefix>_*
 Entity names come from the Bambu Lab integration. If your integration version
 uses a different prefix, set `entity_prefix` explicitly. Missing entities are
 omitted instead of replaced with fake readings.
+
+## Expanded camera
+
+The printer and Camera Card reuse the same `@bitosome/ha-card-ui` media helpers.
+Expand uses confirmed native fullscreen where available, with a safe-area-aware
+media dialog on iOS or when fullscreen is rejected. Pinch to zoom up to 5×, pan
+while zoomed, and tap the magnification button to reset. Controls stay stationary;
+closing returns to the same card button and resets the view. The full image fits
+inside the expanded area until you zoom. Live/snapshot selection remains available.
+
+Only one live player is mounted. Stream-element loading is bounded and offers a
+retry after failure; opening a camera never sends a printer or PTZ command.
 
 ## Electricity cost
 

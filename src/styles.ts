@@ -6,6 +6,7 @@ import {
   glowStyles,
   headerStyles,
   metricStyles,
+  mediaDialogStyles,
   navigationStyles,
   telemetryStyles,
 } from "@bitosome/ha-card-ui";
@@ -17,6 +18,7 @@ export const cardStyles = [
   navigationStyles,
   telemetryStyles,
   dialogStyles,
+  mediaDialogStyles,
   glowStyles,
   componentStyles,
   css`
@@ -407,14 +409,54 @@ export const cardStyles = [
       border-radius: 12px;
       background: #0b0e14;
     }
-    .camera-frame:fullscreen {
+    .camera-frame:is(:fullscreen, :-webkit-full-screen) {
       width: 100vw;
+      height: 100vh;
       height: 100dvh;
       aspect-ratio: auto;
       border-radius: 0;
     }
-    .camera-frame:fullscreen .camera-overlay {
-      inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) auto max(8px, env(safe-area-inset-left));
+    .camera-frame:is(:fullscreen, :-webkit-full-screen) .camera-overlay {
+      inset: max(8px, var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px)) max(8px, var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px)) auto max(8px, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
+    }
+    .camera-viewport,
+    .camera-media {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .camera-media {
+      transform-origin: center;
+    }
+    .camera-expanded .camera-viewport {
+      touch-action: none;
+    }
+    .family-dialog.media .camera-tile {
+      height: 100%;
+      padding: 0;
+      border-radius: 0;
+    }
+    .family-dialog.media .camera-frame {
+      height: 100%;
+      aspect-ratio: auto;
+      border-radius: 0;
+    }
+    .camera-expanded .camera-image {
+      object-fit: contain;
+    }
+    .camera-zoom-reset {
+      position: absolute;
+      bottom: max(8px, var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+      left: max(8px, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
+      z-index: 2;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 12px;
+      border-radius: 12px;
+      color: #fff;
+      background: rgba(5, 8, 12, 0.72);
+      font: inherit;
+      font-weight: 650;
     }
     .camera-frame ha-camera-stream,
     .camera-frame ha-web-rtc-player,

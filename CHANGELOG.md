@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — 2026-10-28
+
+- Reuse Camera Card’s zoom, gesture, stream bootstrap and fullscreen behaviour through the pinned shared UI library v1.1.0.
+- Add pinch zoom, bounded pan and zoom reset to expanded live and snapshot views; retain stationary controls and one active player.
+- Use a safe-area-aware media dialog when native fullscreen is unavailable or rejected; preserve X/Escape and opener focus.
+- Bound stream-element loading, offer retry, and ignore late fullscreen/loading responses after teardown or configuration changes.
+
 ## 0.2.3 — 2026-10-28
 
 - Keep completed electricity estimates current when History was opened during the print; choose the newest matching recorded estimate and refresh visible History after completion.

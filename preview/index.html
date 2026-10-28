@@ -221,11 +221,17 @@
         }
       }
       class HaCameraStream extends HTMLElement {
+        set fitMode(value) {
+          this._fitMode = value;
+          const image = this.shadowRoot?.querySelector("img");
+          if (image) image.style.objectFit = value || "cover";
+        }
         connectedCallback() {
           if (this.shadowRoot) return;
           const root = this.attachShadow({ mode: "open" });
           root.innerHTML =
             '<style>:host{display:block;width:100%;height:100%}img{display:block;width:100%;height:100%;object-fit:cover}</style><img src="/preview/camera.svg" alt="" />';
+          this.fitMode = this._fitMode;
         }
       }
       if (!customElements.get("ha-card")) customElements.define("ha-card", HaCard);
@@ -298,6 +304,7 @@
       makeLink("AMS", pageQuery("ams"), params.get("page") === "ams");
       makeLink("History", dialogQuery("history"), params.get("dialog") === "history");
       makeLink("Details", dialogQuery("details"), params.get("dialog") === "details");
+      makeLink("Camera", dialogQuery("camera"), params.get("dialog") === "camera");
 
       const { hass, cardConfig } = await import("./states.js");
       await import("../dist/bambu-printer-card.js");
@@ -317,6 +324,10 @@
         card.shadowRoot?.querySelector(".cost-button")?.click();
       } else if (dialog === "details") {
         card.shadowRoot?.querySelector('[data-nav="details"]')?.click();
+      } else if (dialog === "camera") {
+        // Exercise the mobile top-layer fallback without relying on the
+        // desktop browser's native fullscreen support.
+        card.openDialog("camera", card.shadowRoot?.querySelector('[aria-label="Expand camera"]'));
       }
       await new Promise((resolve) => setTimeout(resolve, 900));
       window.__previewReady = true;
