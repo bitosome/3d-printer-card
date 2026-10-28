@@ -312,6 +312,7 @@
       card.setConfig(cardConfig);
       document.getElementById("card-shell").append(card);
       card.hass = hass;
+      window.addEventListener("printer-preview-state-changed", () => { card.hass = { ...hass }; });
       await card.updateComplete;
       await new Promise((resolve) => setTimeout(resolve, 650));
 
@@ -327,7 +328,7 @@
       } else if (dialog === "camera") {
         // Exercise the mobile top-layer fallback without relying on the
         // desktop browser's native fullscreen support.
-        card.openDialog("camera", card.shadowRoot?.querySelector('[aria-label="Expand camera"]'));
+        card.cameraFallback.open(card.shadowRoot.querySelector(".camera-frame"), card.shadowRoot.querySelector('[aria-label="Expand camera"]'));
       }
       await new Promise((resolve) => setTimeout(resolve, 900));
       window.__previewReady = true;

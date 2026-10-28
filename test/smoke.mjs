@@ -215,16 +215,16 @@ check(
 );
 check("no printer or HA service was called", serviceCalls.length === 0);
 
-// Camera uses the family dialog on all platforms, including iOS without
-// the Fullscreen API, and never creates a second concurrent live stream.
+// Camera expands in place, including iOS without the Fullscreen API,
+// and never creates a second concurrent live stream.
 const cameraOpener = root.querySelector('[aria-label="Expand camera"]');
 cameraOpener.click();
 await tick(100);
-check("expanded camera uses shared dialog with X dismissal", !!root.querySelector('dialog[open] .camera-frame') && !!root.querySelector('dialog[open] [title="Close"]'));
+check("expanded camera uses shared immersive fullscreen without a dialog", !!root.querySelector('.camera-frame[data-media-fullscreen]') && !root.querySelector("dialog"));
 check("expanded camera keeps only one live player", root.querySelectorAll('ha-camera-stream, ha-web-rtc-player').length === 1);
-root.querySelector('dialog [title="Close"]').click();
+root.querySelector('[aria-label="Exit full screen"]').click();
 await tick(100);
-check("camera dialog restores opener focus", root.activeElement === cameraOpener);
+check("camera fullscreen restores opener focus", root.activeElement === cameraOpener);
 check("camera returns to overview after closing", !!root.querySelector('.overview-grid ha-camera-stream') && !root.querySelector('dialog'));
 
 // History dialog -----------------------------------------------------------

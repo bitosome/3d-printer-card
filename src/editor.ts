@@ -209,6 +209,18 @@ export class BambuPrinterCardEditor extends LitElement {
         ["camera"],
         "Leave empty to use camera.<prefix>_camera.",
       )}
+      ${this.picker(
+        "Printer power switch",
+        "printer_power_entity",
+        ["switch"],
+        "Optional smart plug. Turning the printer off always asks for confirmation.",
+      )}
+      ${this.picker(
+        "External air purifier switch",
+        "air_purifier_entity",
+        ["switch"],
+        "Optional smart plug for an external purifier.",
+      )}
       <div class="divider"></div>
       <div class="field">
         <label for="editor-name">Display name</label>

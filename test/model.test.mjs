@@ -474,4 +474,14 @@ check("numeric series keeps unavailable as a gap", () => {
   assert.equal(parsed[1].v, null);
 });
 
+check("external switches are optional, trimmed and restricted to distinct switches", () => {
+  assert.equal(validateConfig({ printer_entity: "sensor.demo" }).printer_power_entity, undefined);
+  const config = validateConfig({ printer_entity: "sensor.demo", printer_power_entity: " switch.printer ", air_purifier_entity: "switch.purifier" });
+  assert.equal(config.printer_power_entity, "switch.printer");
+  assert.equal(config.air_purifier_entity, "switch.purifier");
+  assert.throws(() => validateConfig({ printer_entity: "sensor.demo", printer_power_entity: "light.printer" }), /switch entity/);
+  assert.throws(() => validateConfig({ printer_entity: "sensor.demo", air_purifier_entity: true }), /string/);
+  assert.throws(() => validateConfig({ printer_entity: "sensor.demo", printer_power_entity: "switch.same", air_purifier_entity: " switch.same " }), /different switch/);
+});
+
 console.log(`\n${passed} model checks passed.`);

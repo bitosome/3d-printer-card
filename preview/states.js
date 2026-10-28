@@ -157,6 +157,8 @@ function tray(unit, slot, name, type, color, remain, active = false) {
 
 const activeSession = sessions[2];
 const states = {
+  "switch.demo_printer_power": entity("switch.demo_printer_power", "on", { friendly_name: "Printer power" }),
+  "switch.demo_air_purifier": entity("switch.demo_air_purifier", "off", { friendly_name: "External air purifier" }),
   [`sensor.${PREFIX}_print_status`]: entity(
     `sensor.${PREFIX}_print_status`,
     "running",
@@ -529,8 +531,14 @@ export const hass = {
   states,
   locale: { language: "en", time_zone: "Europe/Tallinn" },
   config: { time_zone: "Europe/Tallinn" },
-  async callService() {
-    throw new Error("The preview is read-only.");
+  async callService(domain, service, data) {
+    const id = data?.entity_id;
+    if (domain !== "switch" || !["turn_on", "turn_off"].includes(service) ||
+        !["switch.demo_printer_power", "switch.demo_air_purifier"].includes(id)) {
+      throw new Error("Only synthetic accessory switches can be changed in this preview.");
+    }
+    hass.states = { ...hass.states, [id]: { ...hass.states[id], state: service === "turn_on" ? "on" : "off" } };
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("printer-preview-state-changed"));
   },
   async callApi(method, path) {
     if (method !== "GET") throw new Error("Unsupported preview API method");
@@ -563,6 +571,8 @@ export const cardConfig = {
   voltage_entity: "sensor.demo_printer_voltage",
   price_entity: "sensor.real_electricity_price_current_price",
   camera_entity: `camera.${PREFIX}_camera`,
+  printer_power_entity: "switch.demo_printer_power",
+  air_purifier_entity: "switch.demo_air_purifier",
   history_days: HISTORY_DAYS,
   currency: "EUR",
   show_camera: true,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — 2026-10-28
+
+- Expand the existing camera feed in place using the same shared immersive fullscreen controller as Camera Card; remove the media modal and preserve one player, pinch/pan and safe-area controls.
+- Add optional printer-power and external air-purifier controls with explicit On/Off state; printer power-off always requires confirmation.
+- Keep switches usable when printer telemetry is missing, bound pending commands and surface service or state-confirmation failures without automatic retries.
+- Add visual editor selectors and regression coverage for confirmation, configuration races, fullscreen teardown and unavailable entities.
+
 ## 0.3.0 — 2026-10-28
 
 - Reuse Camera Card’s zoom, gesture, stream bootstrap and fullscreen behaviour through the pinned shared UI library v1.1.0.

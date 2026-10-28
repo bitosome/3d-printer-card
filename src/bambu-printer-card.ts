@@ -11,6 +11,7 @@ import { repeat } from "lit/directives/repeat.js";
 import {
   FamilyFlowController,
   MediaZoomController,
+  MediaFullscreenFallbackController,
   UI_ICONS,
   actionPill,
   buildGlow,
@@ -26,6 +27,7 @@ import {
   toggleMediaFullscreen,
 } from "@bitosome/ha-card-ui";
 import "./chart";
+import "./accessory-controls";
 import { cardStyles } from "./styles";
 import {
   MAX_HISTORY_DAYS,
@@ -109,7 +111,7 @@ const LIVE_MAX_GAP_MS = 120_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 type MainPage = "overview" | "ams";
-type DialogPage = "history" | "details" | "preview" | "camera";
+type DialogPage = "history" | "details" | "preview";
 
 function parseTime(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -174,13 +176,15 @@ export class BambuPrinterCard extends LitElement {
   @state() private imageFailed = false;
 
   private cameraZoom = new MediaZoomController(this, {
-    enabled: () => this.cameraFullscreen || this.flow.current === "camera",
+    enabled: () => this.cameraFullscreen,
   });
-  private flow = new FamilyFlowController<DialogPage>(this, {
-    onChange: (route, previous) => {
-      if (route === "camera" || previous === "camera") this.cameraZoom.reset();
+  private cameraFallback = new MediaFullscreenFallbackController(this, {
+    onChange: (active) => {
+      this.cameraFullscreen = active;
+      this.cameraZoom.reset();
     },
   });
+  private flow = new FamilyFlowController<DialogPage>(this);
   private cameraExpansion = 0;
   private overviewRequested = false;
   private overviewGeneration = 0;
@@ -201,6 +205,7 @@ export class BambuPrinterCard extends LitElement {
     this.config = next;
     if (previous === JSON.stringify(next)) return;
     this.flow.forceClose(false);
+    this.closeCamera();
     this.overviewGeneration++;
     this.liveGeneration++;
     this.historyGeneration++;
@@ -271,6 +276,7 @@ export class BambuPrinterCard extends LitElement {
     document.removeEventListener("visibilitychange", this.onVisibility);
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     document.removeEventListener("webkitfullscreenchange", this.onFullscreenChange);
+    this.closeCamera();
     this.cameraExpansion++;
     this.cameraExpanding = false;
     this.cameraZoom.reset();
@@ -354,6 +360,12 @@ export class BambuPrinterCard extends LitElement {
       return;
     }
     const next = resolvePrinter(this.hass.states, this.config);
+    if (next?.camera?.entity_id !== this.printer?.camera?.entity_id) {
+      this.closeCamera();
+      this.cameraGeneration++;
+      this.cameraLoadStarted = false;
+      this.cameraReady = false;
+    }
     if (!next) {
       if (this.printer) {
         this.overviewGeneration++;
@@ -1113,6 +1125,7 @@ export class BambuPrinterCard extends LitElement {
       : "ha-camera-stream";
     const key = `${cameraId}:${tag}`;
     if (this.cameraLoadStarted && this.cameraLoadKey === key) return;
+    if (this.cameraLoadKey !== key) this.cameraZoom.reset();
     this.cameraLoadKey = key;
     this.cameraLoadStarted = true;
     this.cameraReady = false;
@@ -1131,15 +1144,29 @@ export class BambuPrinterCard extends LitElement {
     void this.ensureCameraElements();
   };
 
+  private closeCamera(): void {
+    this.cameraExpansion++;
+    this.cameraExpanding = false;
+    this.cameraFallback.close(false);
+    this.cameraZoom.reset();
+    const frame = this.shadowRoot?.querySelector(".camera-frame");
+    const api = createMediaFullscreenAPI(document);
+    if (frame && isMediaFullscreen(api, frame)) void api.exit().catch(() => undefined);
+  }
+
   private onFullscreenChange = (): void => {
     const frame = this.shadowRoot?.querySelector(".camera-frame");
-    const active = !!frame && isMediaFullscreen(createMediaFullscreenAPI(document), frame);
+    const active = this.cameraFallback.active || (!!frame && isMediaFullscreen(createMediaFullscreenAPI(document), frame));
     if (active !== this.cameraFullscreen) this.cameraZoom.reset();
     this.cameraFullscreen = active;
   };
 
   private async expandCamera(opener: HTMLElement): Promise<void> {
     if (this.cameraExpanding) return;
+    if (this.cameraFallback.active) {
+      this.cameraFallback.close();
+      return;
+    }
     const generation = this.flow.generation;
     const expansion = ++this.cameraExpansion;
     const frame = this.shadowRoot?.querySelector<HTMLElement>(".camera-frame");
@@ -1153,7 +1180,7 @@ export class BambuPrinterCard extends LitElement {
       return;
     }
     this.onFullscreenChange();
-    if (!handled && !api.isFullscreen && !this.flow.active) this.openDialog("camera", opener);
+    if (!handled && !api.isFullscreen && !this.flow.active) this.cameraFallback.open(frame, opener);
   }
 
   // -------------------------------------------------------------------------
@@ -1185,12 +1212,10 @@ export class BambuPrinterCard extends LitElement {
       history: "Print history",
       details: "Printer details",
       preview: "Print preview",
-      camera: "Printer camera",
     };
     const history = page === "history";
     return renderFamilyDialog(this.flow, {
       title: titles[page],
-      className: page === "camera" ? "media" : "",
       content:
         !this.printer
           ? notice({ message: "Printer data is unavailable. It will return when the entity reconnects.", tone: "warning" })
@@ -1198,9 +1223,7 @@ export class BambuPrinterCard extends LitElement {
           ? this.renderHistory()
           : page === "details"
             ? this.renderDetails()
-            : page === "camera"
-              ? this.renderCamera(true)
-              : this.renderPreview(),
+            : this.renderPreview(),
       footer: history ? this.renderHistoryFooter() : undefined,
       wide: true,
       long: history,
@@ -1246,6 +1269,7 @@ export class BambuPrinterCard extends LitElement {
 
   private showPage(page: MainPage): void {
     if (this.flow.active) this.flow.close();
+    this.closeCamera();
     this.page = page;
     this.requestUpdate();
     void this.updateComplete.then(() => {
@@ -1421,7 +1445,7 @@ export class BambuPrinterCard extends LitElement {
     }
     if (!this.printer) {
       const exists = !!this.hass?.states[this.config.printer_entity];
-      return exists
+      return html`${this.renderAccessories()}${exists
         ? this.renderSetup(
             "Entity prefix not recognised",
             `The entity ${this.config.printer_entity} exists, but the related Bambu entities could not be derived. Set entity_prefix to the part before _print_status, for example h2d_0123456789abcdef.`,
@@ -1431,7 +1455,7 @@ export class BambuPrinterCard extends LitElement {
             "Printer entity not found",
             `Home Assistant does not currently expose ${this.config.printer_entity}. Check the Bambu Lab integration, or select another print status sensor in the editor.`,
             true,
-          );
+          )}`;
     }
     return html`<main class="panel" aria-label=${`${this.page} panel`}>
         ${this.page === "ams" ? this.renderAmsPage() : this.renderOverviewPage()}
@@ -1439,9 +1463,18 @@ export class BambuPrinterCard extends LitElement {
       ${this.renderNav()}`;
   }
 
+  private renderAccessories(): TemplateResult {
+    return html`<printer-accessory-controls
+      .hass=${this.hass}
+      .printerPowerEntity=${this.config?.printer_power_entity}
+      .airPurifierEntity=${this.config?.air_purifier_entity}
+      .printerStatus=${this.status}
+    ></printer-accessory-controls>`;
+  }
+
   private renderOverviewPage(): TemplateResult {
     return html`
-      ${this.renderOverviewGrid()} ${this.renderMetrics()}
+      ${this.renderOverviewGrid()} ${this.renderAccessories()} ${this.renderMetrics()}
       ${this.renderTelemetry()} ${this.renderChart()} ${this.renderAmsSummary()}
     `;
   }
@@ -1701,25 +1734,23 @@ export class BambuPrinterCard extends LitElement {
     );
   }
 
-  private renderCamera(expanded = false): TemplateResult {
+  private renderCamera(): TemplateResult {
     const camera = this.printer?.camera;
     if (!camera) return html``;
-    // Keep the opener connected so the shared flow can restore focus.
-    const inDialog = !expanded && this.flow.current === "camera";
     const picture =
       typeof camera.attributes?.entity_picture === "string"
         ? camera.attributes.entity_picture
         : "";
     const webRtc = this.cameraUsesWebRtc;
     const live =
-      !inDialog && this.cameraLive && this.cameraReady && available(camera);
+      this.cameraLive && this.cameraReady && available(camera);
     const loading =
       this.cameraLive && !this.cameraReady && !this.cameraLoadError && available(camera);
     return html`<section
-      class="camera-tile family-surface ${expanded ? "family-media-content" : ""}"
+      class="camera-tile family-surface"
       aria-label="Printer camera"
     >
-      <div class="camera-frame ${expanded || this.cameraFullscreen ? "camera-expanded" : ""}">
+      <div class="camera-frame ${this.cameraFullscreen ? "camera-expanded" : ""}">
         <div class="camera-viewport"
           @touchstart=${this.cameraZoom.touchStart}
           @touchmove=${this.cameraZoom.touchMove}
@@ -1735,7 +1766,7 @@ export class BambuPrinterCard extends LitElement {
                 .entityid=${camera.entity_id}
                 .controls=${false}
                 .muted=${true}
-                .fitMode=${expanded || this.cameraFullscreen ? "contain" : "cover"}
+                .fitMode=${this.cameraFullscreen ? "contain" : "cover"}
                 autoplay
                 playsinline
               ></ha-web-rtc-player>`
@@ -1744,18 +1775,16 @@ export class BambuPrinterCard extends LitElement {
                 .stateObj=${camera}
                 .controls=${false}
                 .muted=${true}
-                .fitMode=${expanded || this.cameraFullscreen ? "contain" : "cover"}
+                .fitMode=${this.cameraFullscreen ? "contain" : "cover"}
               ></ha-camera-stream>`
-          : inDialog
-            ? html`<div class="camera-placeholder">Camera open in expanded view</div>`
-            : picture
+          : picture
             ? html`<img
                 class="camera-image"
                 src=${picture}
                 alt="Printer camera snapshot"
               />`
             : nothing}
-        ${!inDialog && !live && !picture
+        ${!live && !picture
           ? html`<div class="camera-placeholder">
               <ha-icon
                 .icon=${loading
@@ -1803,20 +1832,19 @@ export class BambuPrinterCard extends LitElement {
                   ></ha-icon>
                 </button>`
               : nothing}
-            ${!expanded ? html`<button
+            <button
               class="camera-fullscreen"
               type="button"
               title=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
               aria-label=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
-              aria-haspopup="dialog"
               ?disabled=${this.cameraExpanding}
               @click=${(event: MouseEvent) => void this.expandCamera(event.currentTarget as HTMLElement)}
             >
-              <ha-icon .icon=${this.cameraFullscreen ? UI_ICONS.close : "mdi:fullscreen"} aria-hidden="true"></ha-icon>
-            </button>` : nothing}
+              <ha-icon .icon=${this.cameraFullscreen ? "mdi:fullscreen-exit" : "mdi:fullscreen"} aria-hidden="true"></ha-icon>
+            </button>
           </div>
         </div>
-        ${(expanded || this.cameraFullscreen) && this.cameraZoom.state.scale > 1
+        ${this.cameraFullscreen && this.cameraZoom.state.scale > 1
           ? html`<button class="camera-zoom-reset" type="button"
               aria-label="Reset zoom" title="Reset zoom"
               @click=${() => this.cameraZoom.reset()}>

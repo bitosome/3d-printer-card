@@ -6,7 +6,7 @@ import {
   glowStyles,
   headerStyles,
   metricStyles,
-  mediaDialogStyles,
+  mediaFullscreenStyles,
   navigationStyles,
   telemetryStyles,
 } from "@bitosome/ha-card-ui";
@@ -18,7 +18,7 @@ export const cardStyles = [
   navigationStyles,
   telemetryStyles,
   dialogStyles,
-  mediaDialogStyles,
+  mediaFullscreenStyles,
   glowStyles,
   componentStyles,
   css`
@@ -409,14 +409,14 @@ export const cardStyles = [
       border-radius: 12px;
       background: #0b0e14;
     }
-    .camera-frame:is(:fullscreen, :-webkit-full-screen) {
+    .camera-frame:is(:fullscreen, :-webkit-full-screen, [data-media-fullscreen]) {
       width: 100vw;
       height: 100vh;
       height: 100dvh;
       aspect-ratio: auto;
       border-radius: 0;
     }
-    .camera-frame:is(:fullscreen, :-webkit-full-screen) .camera-overlay {
+    .camera-frame:is(:fullscreen, :-webkit-full-screen, [data-media-fullscreen]) .camera-overlay {
       inset: max(8px, var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px)) max(8px, var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px)) auto max(8px, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
     }
     .camera-viewport,
@@ -430,16 +430,6 @@ export const cardStyles = [
     }
     .camera-expanded .camera-viewport {
       touch-action: none;
-    }
-    .family-dialog.media .camera-tile {
-      height: 100%;
-      padding: 0;
-      border-radius: 0;
-    }
-    .family-dialog.media .camera-frame {
-      height: 100%;
-      aspect-ratio: auto;
-      border-radius: 0;
     }
     .camera-expanded .camera-image {
       object-fit: contain;

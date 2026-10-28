@@ -18,7 +18,7 @@ printer was contacted.</sub>
   weight and length, speed profile and the current print's cover image. Tap the
   cover image for a full print preview.
 - **Live camera** — the same Home Assistant camera/WebRTC elements used by the
-  custom camera card, with native fullscreen and an expandable shared-dialog fallback, a loading state, a still-image
+  custom camera card, with native fullscreen and an immersive in-place fallback, a loading state, a still-image
   fallback and a live/snapshot toggle.
 - **Print cost** — current or last print electricity estimate, energy used and
   weighted average tariff. Tap it for the full print history.
@@ -41,13 +41,19 @@ printer was contacted.</sub>
   flow; the print history has per-print records and the 24-hour chart.
 - **Details** — a read-only dialog with print job, temperatures, fans, power and
   cost, machine, AMS and HMS data. Rows open Home Assistant's native more-info.
+- **External switches** — optional compact printer-power and air-purifier
+  controls. Printer power-off always requires confirmation, with a reminder
+  when a print is active or paused. Controls show Home Assistant's reported
+  switch state and remain available when the printer is offline.
 - **Responsive and theme-aware** — one column on phones, two AMS cards side by
   side and four metrics across on wider cards; light and dark themes; 44px
   touch targets, keyboard focus and reduced-motion support.
 
-The card is deliberately **read-only**. It does not pause, stop or start a
-print, and it never sends a printer command. Use Bambu Handy, Bambu Studio or
-the Bambu Lab integration for control.
+Print monitoring is **read-only**: the card does not pause, stop or start a
+print through the Bambu integration. Optional external switches use Home
+Assistant's `switch.turn_on` and `switch.turn_off` services. Cutting printer
+power interrupts an active print; the card always asks before doing so.
+Use Bambu Handy, Bambu Studio or the Bambu Lab integration for print commands.
 
 ## Install
 
@@ -115,6 +121,8 @@ current_entity: sensor.<printer>_current
 voltage_entity: sensor.<printer>_voltage
 price_entity: sensor.real_electricity_price_current_price
 camera_entity: camera.<printer>_camera
+printer_power_entity: switch.<printer>_smart_plug
+air_purifier_entity: switch.<purifier>_smart_plug
 history_days: 7
 currency: EUR
 show_camera: true
@@ -132,6 +140,8 @@ show_ams: true
 | `voltage_entity` | no | Voltage in V, shown in the telemetry strip. |
 | `price_entity` | cost | Electricity price in currency/kWh. Its recorded history prices each interval. |
 | `camera_entity` | no | Camera entity. Defaults to `camera.<prefix>_camera`. |
+| `printer_power_entity` | no | External printer smart-plug switch. Power-off requires confirmation. |
+| `air_purifier_entity` | no | External air-purifier smart-plug switch. Must differ from the printer switch. |
 | `history_days` | no | Recorder window for print history, 1–30; default 7. |
 | `currency` | no | ISO 4217 code for cost display. Derived from the price unit when possible. |
 | `show_camera` | no | Default `true`. Set `false` to save camera bandwidth. |
@@ -165,7 +175,9 @@ omitted instead of replaced with fake readings.
 
 The printer and Camera Card reuse the same `@bitosome/ha-card-ui` media helpers.
 Expand uses confirmed native fullscreen where available, with a safe-area-aware
-media dialog on iOS or when fullscreen is rejected. Pinch to zoom up to 5×, pan
+edge-to-edge in-place view on iOS or when fullscreen is rejected. There is no
+modal header or second player: the existing feed expands just like Camera Card.
+Use the fullscreen-exit control or Escape to return. Pinch to zoom up to 5×, pan
 while zoomed, and tap the magnification button to reset. Controls stay stationary;
 closing returns to the same card button and resets the view. The full image fits
 inside the expanded area until you zoom. Live/snapshot selection remains available.

@@ -2,8 +2,8 @@
  * Shared types for the Bambu Lab printer card.
  *
  * The card deliberately depends on Home Assistant entities only. It never
- * imports from the Bambu Lab integration or a sibling card, and never writes
- * to the printer.
+ * imports from the Bambu Lab integration or a sibling card. Optional external
+ * switches are controlled through Home Assistant; printer jobs remain read-only.
  */
 
 export interface HassEntity {
@@ -56,6 +56,10 @@ export interface CardConfig {
   /** Electricity price sensor in currency/kWh. */
   price_entity?: string;
   camera_entity?: string;
+  /** Optional external smart plug. Turning it off requires confirmation. */
+  printer_power_entity?: string;
+  /** Optional external air purifier smart plug. */
+  air_purifier_entity?: string;
   /** Recorder history window for the print history view. 1-30 days. */
   history_days?: number;
   /** ISO 4217 currency code for cost display. Derived from price unit if omitted. */

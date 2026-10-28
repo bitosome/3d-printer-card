@@ -1241,6 +1241,8 @@ export function validateConfig(input: CardConfig): CardConfig {
     "voltage_entity",
     "price_entity",
     "camera_entity",
+    "printer_power_entity",
+    "air_purifier_entity",
     "currency",
   ] as const) {
     if (input[key] !== undefined && typeof input[key] !== "string") {
@@ -1250,12 +1252,24 @@ export function validateConfig(input: CardConfig): CardConfig {
   if (input.currency && !/^[A-Za-z]{3}$/.test(input.currency)) {
     throw new Error("currency must be a three-letter ISO 4217 code.");
   }
+  for (const key of ["printer_power_entity", "air_purifier_entity"] as const) {
+    const entityId = input[key]?.trim();
+    if (entityId && !/^switch\.[a-z0-9_]+$/.test(entityId)) {
+      throw new Error(`${key} must be a switch entity id.`);
+    }
+  }
+  if (input.printer_power_entity?.trim() &&
+      input.printer_power_entity.trim() === input.air_purifier_entity?.trim()) {
+    throw new Error("Printer power and air purifier must use different switch entities.");
+  }
   const config: CardConfig = {
     ...input,
     printer_entity: input.printer_entity?.trim() || "",
     history_days: clampHistoryDays(input.history_days),
     show_camera: input.show_camera !== false,
     show_ams: input.show_ams !== false,
+    printer_power_entity: input.printer_power_entity?.trim() || undefined,
+    air_purifier_entity: input.air_purifier_entity?.trim() || undefined,
   };
   return config;
 }
