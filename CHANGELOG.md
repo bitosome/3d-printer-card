@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 — 2026-10-28
+## 0.2.2 — 2026-10-28
 
 - Align headers, state chips, metric labels and telemetry with the pinned shared UI library; retain temperature targets and keep previews accessible on narrow cards.
 - Fix the preview expand icon, WebRTC sizing, touch hover states and editor accessibility. Details dialogs fit their content.

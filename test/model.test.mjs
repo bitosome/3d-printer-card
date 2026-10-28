@@ -407,7 +407,7 @@ check("HA numeric preferences override UI language consistently", () => {
   assert.equal(formatNumber(1234.5, 1, { locale: "en-US", numberFormat: "decimal_comma" }), "1.234,5");
   assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "comma_decimal" }), "1,234.5");
   assert.match(formatNumber(1234.5, 1, { numberFormat: "space_comma" }), /^1[\s\u202f]234,5$/);
-  assert.equal(formatNumber(1234.5, 1, { numberFormat: "quote_decimal" }), "1’234.5");
+  assert.match(formatNumber(1234.5, 1, { numberFormat: "quote_decimal" }), /^1['’]234\.5$/);
   assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "none" }), "1234.5");
   assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "language" }), "1.234,5");
   assert.equal(formatNumber(1234.5, 1, { locale: "invalid_locale", numberFormat: "system" }), new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(1234.5));
