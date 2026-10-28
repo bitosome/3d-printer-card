@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 — 2026-10-28
+
+- Align headers, state chips, metric labels and telemetry with the pinned shared UI library; retain temperature targets and keep previews accessible on narrow cards.
+- Fix the preview expand icon, WebRTC sizing, touch hover states and editor accessibility. Details dialogs fit their content.
+- Add the shared camera dialog fallback when native fullscreen is unavailable or rejected; include an explicit fullscreen exit and avoid duplicate streams.
+- Recover interrupted Recorder requests after reconnect or a temporarily missing printer; ignore obsolete results and retain history disclosure identity.
+- Correct stale-power and cumulative-energy cost estimates, mark incomplete coverage, and keep normalized tariff units accurate.
+- Honor Home Assistant number, clock and time-zone preferences; chart summaries report observed readings rather than padded axis limits.
+- Extend offline regression coverage for accounting, reconnects, stale responses, camera dialogs and accessibility.
+
 ## 0.2.0 — 2026-10-27
 
 - Added the shared bottom navigation: **Overview**, **AMS**, **History** and

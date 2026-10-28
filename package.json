@@ -1,6 +1,6 @@
 {
   "name": "bambu-printer-card",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bambu Lab 3D printer card for Home Assistant with live stream, AMS state and electricity cost per print",
   "keywords": [
     "home-assistant",
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npm run rollup",
     "rollup": "rollup -c",
-    "test": "npm run build:test && node test/model.test.mjs && node test/smoke.mjs",
+    "test": "npm run build:test && node test/model.test.mjs && node test/smoke.mjs && node test/lifecycle.mjs && node test/ui-contract.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build && npm test",
     "build:test": "tsc src/model.ts src/types.ts --outDir test-build --module ESNext --target ES2020 --moduleResolution bundler --skipLibCheck --strict --lib ES2021,DOM,DOM.Iterable"

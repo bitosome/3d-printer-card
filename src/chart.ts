@@ -203,14 +203,27 @@ export class BambuPrintChart extends LitElement {
 
     const chartWidth = width - PAD.left - PAD.right;
     const chartHeight = height - PAD.top - PAD.bottom;
-    const maxPower = niceMax(
-      Math.max(0, ...this.buckets.map((bucket) => bucket.power ?? 0)),
-      100,
-    );
-    const maxCurrent = niceMax(
-      Math.max(0, ...this.buckets.map((bucket) => bucket.current ?? 0)),
-      1,
-    );
+    // Axis bounds include headroom; they are not measured peaks. Describe the
+    // plotted samples separately, preserving missing data as unavailable.
+    const peak = (key: "power" | "current"): number | null => {
+      const values = this.buckets
+        .map((bucket) => bucket[key])
+        .filter((value): value is number => value !== null && Number.isFinite(value));
+      return values.length ? Math.max(...values) : null;
+    };
+    const peakPower = peak("power");
+    const peakCurrent = peak("current");
+    const maxPower = niceMax(peakPower ?? 0, 100);
+    const maxCurrent = niceMax(peakCurrent ?? 0, 1);
+    const summary = [
+      `Power and current for the last ${formatNumber((end - start) / 3_600_000, 1, this.context)} hours.`,
+      peakPower === null
+        ? "Power unavailable."
+        : `Highest plotted power ${formatNumber(peakPower, 0, this.context)} watts.`,
+      peakCurrent === null
+        ? "Current unavailable."
+        : `Highest plotted current ${formatNumber(peakCurrent, 2, this.context)} amps.`,
+    ].join(" ");
     const x = (time: number) =>
       PAD.left + ((time - start) / (end - start)) * chartWidth;
     const yPower = (value: number) =>
@@ -250,7 +263,7 @@ export class BambuPrintChart extends LitElement {
       <svg
         viewBox="0 0 ${width} ${height}"
         role="img"
-        aria-label=${`Power and current for the last ${Math.round((end - start) / 3_600_000)} hours. Peak power ${formatNumber(maxPower, 0)} watts, peak current ${formatNumber(maxCurrent, 1)} amps.`}
+        aria-label=${summary}
       >
         ${[0, 0.5, 1].map(
           (fraction) => svg`<line
@@ -271,7 +284,7 @@ export class BambuPrintChart extends LitElement {
           (segment) => svg`<path class="current-line" d=${segment.line}></path>`,
         )}
         <text class="axis" x=${PAD.left - 6} y=${PAD.top + 4} text-anchor="end">
-          ${formatNumber(maxPower, 0)}
+          ${formatNumber(maxPower, 0, this.context)}
         </text>
         <text class="axis" x=${PAD.left - 6} y=${baseline + 4} text-anchor="end">
           0
@@ -285,7 +298,7 @@ export class BambuPrintChart extends LitElement {
           y=${PAD.top + 4}
           text-anchor="start"
         >
-          ${formatNumber(maxCurrent, 1)}
+          ${formatNumber(maxCurrent, 1, this.context)}
         </text>
         <text
           class="axis"

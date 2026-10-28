@@ -6,7 +6,8 @@ import {
   type TemplateResult,
 } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { ref } from "lit/directives/ref.js";
+import { repeat } from "lit/directives/repeat.js";
+
 import {
   FamilyFlowController,
   UI_ICONS,
@@ -16,6 +17,7 @@ import {
   notice,
   renderFamilyDialog,
   showEntityMoreInfo,
+  stateChip,
   tileGlow,
 } from "@bitosome/ha-card-ui";
 import "./chart";
@@ -99,7 +101,7 @@ const LIVE_SAMPLE_MIN_MS = 5_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 type MainPage = "overview" | "ams";
-type DialogPage = "history" | "details" | "preview";
+type DialogPage = "history" | "details" | "preview" | "camera";
 
 function parseTime(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -158,6 +160,7 @@ export class BambuPrinterCard extends LitElement {
   @state() private liveReady = false;
   @state() private cameraReady = false;
   @state() private cameraLive = true;
+  @state() private cameraFullscreen = false;
   @state() private imageFailed = false;
 
   private flow = new FamilyFlowController<DialogPage>(this);
@@ -168,7 +171,7 @@ export class BambuPrinterCard extends LitElement {
   private lastStatus: PrinterStatus | null = null;
   private lastCoverUrl = "";
   private cameraLoadStarted = false;
-  private cameraFrameEl?: HTMLElement;
+  private cameraGeneration = 0;
   private refreshTimer?: ReturnType<typeof setInterval>;
   private finishTimer?: ReturnType<typeof setTimeout>;
   private lastHistoryLoad = 0;
@@ -196,11 +199,13 @@ export class BambuPrinterCard extends LitElement {
     this.lastStatus = null;
     this.lastCoverUrl = "";
     this.imageFailed = false;
+    this.cameraGeneration++;
     this.cameraLoadStarted = false;
+    this.cameraReady = false;
     this.cameraLive = true;
     this.page = "overview";
     this.clearFinishTimer();
-    if (this.hass) this.handleHass();
+    if (this.hass && this.isConnected) this.handleHass();
     this.requestUpdate();
   }
 
@@ -229,7 +234,9 @@ export class BambuPrinterCard extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener("visibilitychange", this.onVisibility);
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
     this.startRefreshTimer();
+    this.handleHass();
   }
 
   firstUpdated(): void {
@@ -238,16 +245,26 @@ export class BambuPrinterCard extends LitElement {
 
   disconnectedCallback(): void {
     document.removeEventListener("visibilitychange", this.onVisibility);
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+    this.cameraFullscreen = false;
     this.stopRefreshTimer();
     this.clearFinishTimer();
     this.overviewGeneration++;
     this.liveGeneration++;
     this.historyGeneration++;
-    this.cameraFrameEl = undefined;
+    this.overviewLoading = false;
+    this.historyLoading = false;
+    this.overviewRequested = false;
+    this.live = null;
+    this.liveStart = null;
+    this.liveReady = false;
+    this.cameraGeneration++;
+    this.cameraLoadStarted = false;
     super.disconnectedCallback();
   }
 
   protected updated(changed: PropertyValues): void {
+    if (!this.isConnected) return;
     if (changed.has("hass") || changed.has("config")) this.handleHass();
     if (
       this.flow.current === "history" &&
@@ -279,8 +296,8 @@ export class BambuPrinterCard extends LitElement {
   }
 
   private get priceUnit(): string {
-    const unit = unitOf(this.printer?.price);
-    if (unit) return unit;
+    // Numeric prices are normalized to currency/kWh by the model.
+    // Never display the original MWh or cents unit beside that value.
     const symbol = currencySymbol(this.currencyCode);
     return symbol ? `${symbol}/kWh` : "/kWh";
   }
@@ -303,13 +320,26 @@ export class BambuPrinterCard extends LitElement {
   }
 
   private handleHass(): void {
-    if (!this.hass || !this.config) return;
+    if (!this.isConnected || !this.hass || !this.config) return;
     if (!this.config.printer_entity) {
       this.printer = null;
       return;
     }
     const next = resolvePrinter(this.hass.states, this.config);
     if (!next) {
+      if (this.printer) {
+        this.overviewGeneration++;
+        this.historyGeneration++;
+        this.liveGeneration++;
+        this.overviewLoading = false;
+        this.historyLoading = false;
+        this.overviewRequested = false;
+        this.overview = null;
+        this.history = null;
+        this.live = null;
+        this.liveStart = null;
+        this.liveReady = false;
+      }
       this.printer = null;
       return;
     }
@@ -388,6 +418,7 @@ export class BambuPrinterCard extends LitElement {
     }
 
     if (this.liveStart !== null) {
+      this.liveGeneration++;
       this.liveStart = null;
       this.live = null;
       this.liveReady = false;
@@ -969,6 +1000,7 @@ export class BambuPrinterCard extends LitElement {
       return;
     }
     this.cameraLoadStarted = true;
+    const generation = ++this.cameraGeneration;
     const cameraId = this.printer.camera.entity_id;
     const tag = this.cameraUsesWebRtc
       ? "ha-web-rtc-player"
@@ -991,24 +1023,40 @@ export class BambuPrinterCard extends LitElement {
         // The still image remains as a fallback.
       }
     }
-    if (typeof customElements === "undefined") return;
+    if (generation !== this.cameraGeneration || !this.isConnected || typeof customElements === "undefined") return;
     if (customElements.get(tag)) {
       this.cameraReady = true;
       return;
     }
     try {
       await customElements.whenDefined(tag);
-      this.cameraReady = true;
+      if (generation === this.cameraGeneration && this.isConnected) this.cameraReady = true;
     } catch {
       // Leave the snapshot fallback in place.
     }
   }
 
-  private fullscreen(): void {
-    const element = this.cameraFrameEl;
-    if (element?.requestFullscreen) {
-      void element.requestFullscreen().catch(() => undefined);
+  private onFullscreenChange = (): void => {
+    this.cameraFullscreen = !!this.shadowRoot?.querySelector(".camera-frame:fullscreen");
+  };
+
+  private async expandCamera(opener: HTMLElement): Promise<void> {
+    if (this.cameraFullscreen) {
+      await document.exitFullscreen?.();
+      return;
     }
+    const generation = this.flow.generation;
+    const frame = this.shadowRoot?.querySelector<HTMLElement>(".camera-frame");
+    if (frame?.requestFullscreen) {
+      try {
+        await frame.requestFullscreen();
+        this.onFullscreenChange();
+        if (this.cameraFullscreen) return;
+      } catch {
+        // iOS and embedded browsers may lack or reject native fullscreen.
+      }
+    }
+    if (this.isConnected && generation === this.flow.generation && !this.flow.active) this.openDialog("camera", opener);
   }
 
   // -------------------------------------------------------------------------
@@ -1040,19 +1088,24 @@ export class BambuPrinterCard extends LitElement {
       history: "Print history",
       details: "Printer details",
       preview: "Print preview",
+      camera: "Printer camera",
     };
     const history = page === "history";
     return renderFamilyDialog(this.flow, {
       title: titles[page],
       content:
-        page === "history"
+        !this.printer
+          ? notice({ message: "Printer data is unavailable. It will return when the entity reconnects.", tone: "warning" })
+          : page === "history"
           ? this.renderHistory()
           : page === "details"
             ? this.renderDetails()
-            : this.renderPreview(),
+            : page === "camera"
+              ? this.renderCamera(true)
+              : this.renderPreview(),
       footer: history ? this.renderHistoryFooter() : undefined,
       wide: true,
-      long: history || page === "details",
+      long: history,
     });
   }
 
@@ -1189,10 +1242,10 @@ export class BambuPrinterCard extends LitElement {
       <div class="family-identity">
         <div class="family-title-row">
           <h1 class="family-title">${name}</h1>
-          <span class="status-chip" data-tone=${tone}>
-            <span class="status-dot" aria-hidden="true"></span>
-            ${printer ? statusLabel(status) : this.config?.printer_entity ? "Unavailable" : "Setup"}
-          </span>
+          ${stateChip({
+            label: printer ? statusLabel(status) : this.config?.printer_entity ? "Unavailable" : "Setup",
+            tone,
+          })}
         </div>
         <div class="family-subtitle">${subtitle}</div>
       </div>
@@ -1390,10 +1443,10 @@ export class BambuPrinterCard extends LitElement {
             ? `Layer ${printer.currentLayer.state} / ${printer.totalLayers.state}`
             : null,
           printer.printWeight && available(printer.printWeight)
-            ? `${formatNumber(entityNumber(printer.printWeight), 1)} g`
+            ? `${formatNumber(entityNumber(printer.printWeight), 1, this.formatContext)} g`
             : null,
           printer.printLength && available(printer.printLength)
-            ? `${formatNumber(entityNumber(printer.printLength), 1)} m`
+            ? `${formatNumber(entityNumber(printer.printLength), 1, this.formatContext)} m`
             : null,
           printer.speedProfile && available(printer.speedProfile)
             ? String(printer.speedProfile.state)
@@ -1402,7 +1455,7 @@ export class BambuPrinterCard extends LitElement {
       : hasLast && last
         ? [
             formatDuration(last.end - last.start),
-            quote ? formatEnergy(quote.energy) : null,
+            quote ? formatEnergy(quote.energy, this.formatContext) : null,
             last.partialEnd ? "connection lost" : null,
           ].filter((value): value is string => !!value)
         : [
@@ -1419,7 +1472,11 @@ export class BambuPrinterCard extends LitElement {
     const costValue = !this.costConfigured
       ? "Not tracked"
       : quote
-        ? this.cost(quote.cost)
+        ? quote.energy <= 0 && quote.gaps
+          ? "No estimate"
+          : quote.pricedEnergy <= 0 && quote.unpricedEnergy > 0
+            ? "Unpriced"
+            : this.cost(quote.cost)
         : active
           ? "Estimating…"
           : hasLast
@@ -1428,7 +1485,7 @@ export class BambuPrinterCard extends LitElement {
     const costNote = !this.costConfigured
       ? "Add a power and price sensor in the editor."
       : quote
-        ? `${formatEnergy(quote.energy)} · ${
+        ? `${formatEnergy(quote.energy, this.formatContext)} · ${
             quote.averagePrice !== null
               ? `avg ${formatPrice(quote.averagePrice, this.formatContext)} ${this.priceUnit}`
               : "no priced energy"
@@ -1462,7 +1519,7 @@ export class BambuPrinterCard extends LitElement {
             ${active || hasLast
               ? html`<div class="hero-progress-row">
                     <strong class="hero-percent">
-                      ${formatNumber(progress, 0)}<small>%</small>
+                      ${formatNumber(progress, 0, this.formatContext)}<small>%</small>
                     </strong>
                     <span class="hero-eta">${eta}</span>
                   </div>
@@ -1546,25 +1603,25 @@ export class BambuPrinterCard extends LitElement {
     );
   }
 
-  private renderCamera(): TemplateResult {
+  private renderCamera(expanded = false): TemplateResult {
     const camera = this.printer?.camera;
     if (!camera) return html``;
+    // Keep the opener connected so the shared flow can restore focus.
+    const inDialog = !expanded && this.flow.current === "camera";
     const picture =
       typeof camera.attributes?.entity_picture === "string"
         ? camera.attributes.entity_picture
         : "";
     const webRtc = this.cameraUsesWebRtc;
     const live =
-      this.cameraLive && this.cameraReady && available(camera);
+      !inDialog && this.cameraLive && this.cameraReady && available(camera);
     const loading =
       this.cameraLive && !this.cameraReady && available(camera);
     return html`<section
       class="camera-tile family-surface"
       aria-label="Printer camera"
     >
-      <div class="camera-frame" ${ref((el) => {
-        this.cameraFrameEl = el as HTMLElement | undefined;
-      })}>
+      <div class="camera-frame">
         ${live
           ? webRtc
             ? html`<ha-web-rtc-player
@@ -1581,14 +1638,16 @@ export class BambuPrinterCard extends LitElement {
                 .controls=${false}
                 .muted=${true}
               ></ha-camera-stream>`
-          : picture
+          : inDialog
+            ? html`<div class="camera-placeholder">Camera open in expanded view</div>`
+            : picture
             ? html`<img
                 class="camera-image"
                 src=${picture}
                 alt="Printer camera snapshot"
               />`
             : nothing}
-        ${!live && !picture
+        ${!inDialog && !live && !picture
           ? html`<div class="camera-placeholder">
               <ha-icon
                 .icon=${loading
@@ -1612,28 +1671,29 @@ export class BambuPrinterCard extends LitElement {
               ? html`<button
                   class="camera-fullscreen"
                   type="button"
-                  title=${live ? "Show camera snapshot" : "Show live stream"}
-                  aria-label=${live ? "Show camera snapshot" : "Show live camera stream"}
-                  aria-pressed=${String(!live)}
+                  title=${this.cameraLive ? "Show camera snapshot" : "Show live stream"}
+                  aria-label=${this.cameraLive ? "Show camera snapshot" : "Show live camera stream"}
+                  aria-pressed=${String(!this.cameraLive)}
                   @click=${() => {
                     this.cameraLive = !this.cameraLive;
                   }}
                 >
                   <ha-icon
-                    .icon=${live ? "mdi:image-outline" : "mdi:video-outline"}
+                    .icon=${this.cameraLive ? "mdi:image-outline" : "mdi:video-outline"}
                     aria-hidden="true"
                   ></ha-icon>
                 </button>`
               : nothing}
-            <button
+            ${!expanded ? html`<button
               class="camera-fullscreen"
               type="button"
-              title="Full screen camera"
-              aria-label="Open camera full screen"
-              @click=${() => this.fullscreen()}
+              title=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
+              aria-label=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
+              aria-haspopup="dialog"
+              @click=${(event: MouseEvent) => void this.expandCamera(event.currentTarget as HTMLElement)}
             >
-              <ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon>
-            </button>
+              <ha-icon .icon=${this.cameraFullscreen ? UI_ICONS.close : "mdi:fullscreen"} aria-hidden="true"></ha-icon>
+            </button>` : nothing}
           </div>
         </div>
       </div>
@@ -1649,16 +1709,16 @@ export class BambuPrinterCard extends LitElement {
     unavailable = false,
     entityId?: string | null,
   ): TemplateResult {
-    const content = html`<span class="metric-head"
+    const content = html`<span class="family-metric-top"
         ><ha-icon .icon=${icon} aria-hidden="true"></ha-icon
-        ><span>${label}</span></span
+        ><span class="family-metric-label">${label}</span></span
       >
       <span class="family-metric-value ${unavailable ? "missing" : ""}"
         >${unavailable ? "Unavailable" : value}${!unavailable && unit
           ? html`<small>${unit}</small>`
           : nothing}</span
       >
-      <span class="metric-sub">${sub}</span>`;
+      ${sub && !unavailable ? html`<span class="metric-sub">${sub}</span>` : nothing}`;
     const interactive = !!entityId && !!this.hass?.states[entityId];
     return interactive
       ? html`<button
@@ -1697,9 +1757,11 @@ export class BambuPrinterCard extends LitElement {
       unavailable ? "" : unit,
       unavailable
         ? "Unavailable"
-        : target !== null && target > 0
-          ? `Target ${formatNumber(target, digits, this.formatContext)} ${unitOf(targetEntity) || unit}`
-          : "No target",
+        : target === null
+          ? targetEntity ? "Target unavailable" : ""
+          : target > 0
+            ? `Target ${formatNumber(target, digits, this.formatContext)} ${unitOf(targetEntity) || unit}`
+            : "No target",
       unavailable,
       valueEntity?.entity_id,
     );
@@ -1780,11 +1842,11 @@ export class BambuPrinterCard extends LitElement {
     value: string,
     options: { entityId?: string | null; onClick?: () => void } = {},
   ): TemplateResult {
-    const content = html`<span class="telemetry-label">${label}</span>
-      <span class="telemetry-value">${value}</span>`;
+    const content = html`<span class="telemetry-label family-telemetry-label">${label}</span>
+      <span class="telemetry-value family-telemetry-value">${value}</span>`;
     if (options.entityId && this.hass?.states[options.entityId]) {
       return html`<button
-        class="telemetry-cell"
+        class="telemetry-cell family-telemetry-cell"
         type="button"
         data-telemetry=${key}
         aria-haspopup="dialog"
@@ -1796,7 +1858,7 @@ export class BambuPrinterCard extends LitElement {
     }
     if (options.onClick) {
       return html`<button
-        class="telemetry-cell"
+        class="telemetry-cell family-telemetry-cell"
         type="button"
         data-telemetry=${key}
         aria-haspopup="dialog"
@@ -1806,7 +1868,7 @@ export class BambuPrinterCard extends LitElement {
         ${content}
       </button>`;
     }
-    return html`<div class="telemetry-cell" data-telemetry=${key}>${content}</div>`;
+    return html`<div class="telemetry-cell family-telemetry-cell" data-telemetry=${key}>${content}</div>`;
   }
 
   private renderTelemetry(): TemplateResult | typeof nothing {
@@ -1817,7 +1879,7 @@ export class BambuPrinterCard extends LitElement {
         this.telemetryCell(
           "current",
           "Current",
-          formatCurrent(currentAmps(printer.current)),
+          formatCurrent(currentAmps(printer.current), this.formatContext),
           { entityId: printer.current.entity_id },
         ),
       );
@@ -1827,7 +1889,7 @@ export class BambuPrinterCard extends LitElement {
         this.telemetryCell(
           "voltage",
           "Voltage",
-          formatVoltage(asNumber(printer.voltage.state)),
+          formatVoltage(asNumber(printer.voltage.state), this.formatContext),
           { entityId: printer.voltage.entity_id },
         ),
       );
@@ -1848,13 +1910,13 @@ export class BambuPrinterCard extends LitElement {
         this.telemetryCell(
           "energy",
           isActiveStatus(this.status) ? "Energy · this print" : "Energy · last print",
-          formatEnergy(quote.energy),
+          formatEnergy(quote.energy, this.formatContext),
           { onClick: () => this.openDialog("history") },
         ),
       );
     }
     if (!cells.length) return nothing;
-    return html`<div class="telemetry family-surface">${cells}</div>`;
+    return html`<div class="telemetry family-telemetry family-surface">${cells}</div>`;
   }
 
   private renderChart(): TemplateResult | typeof nothing {
@@ -1863,8 +1925,8 @@ export class BambuPrinterCard extends LitElement {
     const power = powerWatts(printer.power);
     const current = currentAmps(printer.current);
     const sub = [
-      power !== null ? formatPower(power) : null,
-      current !== null ? formatCurrent(current) : null,
+      power !== null ? formatPower(power, this.formatContext) : null,
+      current !== null ? formatCurrent(current, this.formatContext) : null,
     ]
       .filter((value): value is string => !!value)
       .join(" · ");
@@ -1924,13 +1986,13 @@ export class BambuPrinterCard extends LitElement {
         : null;
     const meta = [
       options.empty ? "No filament" : options.type || null,
-      remain !== null ? `${formatNumber(remain, 0)}%` : null,
+      remain !== null ? `${formatNumber(remain, 0, this.formatContext)}%` : null,
       options.active ? "Active" : null,
     ].filter((value): value is string => !!value);
     const aria = [
       options.label,
       options.empty ? "empty" : options.name,
-      remain !== null ? `${formatNumber(remain, 0)} percent remaining` : null,
+      remain !== null ? `${formatNumber(remain, 0, this.formatContext)} percent remaining` : null,
       options.active ? "active" : null,
     ]
       .filter((value): value is string => !!value)
@@ -1983,15 +2045,15 @@ export class BambuPrinterCard extends LitElement {
     const loaded = unit.trays.filter((tray) => !tray.empty).length;
     const environment = [
       unit.temperature
-        ? formatTemperature(entityNumber(unit.temperature))
+        ? formatTemperature(entityNumber(unit.temperature), this.formatContext)
         : null,
-      unit.humidity ? formatPercent(entityNumber(unit.humidity)) : null,
+      unit.humidity ? formatPercent(entityNumber(unit.humidity), this.formatContext) : null,
     ]
       .filter((value): value is string => !!value)
       .join(" · ");
     const remain =
       focus && focus.remainEnabled && focus.remain !== null
-        ? `${formatNumber(focus.remain, 0)}%`
+        ? `${formatNumber(focus.remain, 0, this.formatContext)}%`
         : null;
     const meta = focus
       ? [focus.type || null, remain, focus.active ? "Active" : null]
@@ -2122,9 +2184,9 @@ export class BambuPrinterCard extends LitElement {
       <div class="ams-grid">
         ${units.map((unit) => {
           const temperature = formatTemperature(
-            entityNumber(unit.temperature),
+            entityNumber(unit.temperature), this.formatContext,
           );
-          const humidity = formatPercent(entityNumber(unit.humidity));
+          const humidity = formatPercent(entityNumber(unit.humidity), this.formatContext);
           const environment = [
             unit.temperature ? temperature : null,
             unit.humidity ? humidity : null,
@@ -2217,7 +2279,8 @@ export class BambuPrinterCard extends LitElement {
       ? html`<button
           class="data-row"
           type="button"
-          aria-label=${`${label}: ${value}. Open history`}
+          aria-haspopup="dialog"
+          aria-label=${`${label}: ${value}. Open entity details`}
           @click=${() => this.moreInfo(entityId)}
         >
           ${content}<ha-icon .icon=${UI_ICONS.next} aria-hidden="true"></ha-icon>
@@ -2265,7 +2328,7 @@ export class BambuPrinterCard extends LitElement {
             <span>The Bambu cover image is not available for this print.</span>
           </div>`}
       <p class="preview-caption">
-        ${task ? `${task} · ` : ""}Reported by the Bambu Lab cover image entity.
+        ${task || "Print preview"}
       </p>
     </div>`;
   }
@@ -2295,11 +2358,7 @@ export class BambuPrinterCard extends LitElement {
       : printer.printableObjects?.state ?? "—";
     return html`<div class="modal-content">
       <div class="dialog-intro">
-        <span class="eyebrow">Read-only printer telemetry</span>
-        <p>
-          This card reads Home Assistant entities and recorder history. It does
-          not pause, stop or start a print, and it never sends a printer command.
-        </p>
+
         ${actionPill({
           label: "View print history",
           icon: UI_ICONS.history,
@@ -2312,7 +2371,7 @@ export class BambuPrinterCard extends LitElement {
         this.dataRow("Stage", humanize(printer.stage?.state), printer.stage?.entity_id),
         this.dataRow(
           "Progress",
-          progress === null ? "—" : formatPercent(progress),
+          progress === null ? "—" : formatPercent(progress, this.formatContext),
           printer.progress?.entity_id,
         ),
         this.dataRow(
@@ -2328,14 +2387,14 @@ export class BambuPrinterCard extends LitElement {
         this.dataRow(
           "Weight",
           printer.printWeight
-            ? `${formatNumber(entityNumber(printer.printWeight), 1)} ${unitOf(printer.printWeight) || "g"}`
+            ? `${formatNumber(entityNumber(printer.printWeight), 1, this.formatContext)} ${unitOf(printer.printWeight) || "g"}`
             : "—",
           printer.printWeight?.entity_id,
         ),
         this.dataRow(
           "Filament length",
           printer.printLength
-            ? `${formatNumber(entityNumber(printer.printLength), 1)} ${unitOf(printer.printLength) || "m"}`
+            ? `${formatNumber(entityNumber(printer.printLength), 1, this.formatContext)} ${unitOf(printer.printLength) || "m"}`
             : "—",
           printer.printLength?.entity_id,
         ),
@@ -2351,32 +2410,32 @@ export class BambuPrinterCard extends LitElement {
       ${this.group("Temperatures", [
         this.dataRow(
           "Bed",
-          `${formatTemperature(entityNumber(printer.bed))}${entityNumber(printer.bedTarget) !== null && (entityNumber(printer.bedTarget) ?? 0) > 0 ? ` → ${formatTemperature(entityNumber(printer.bedTarget))}` : ""}`,
+          `${formatTemperature(entityNumber(printer.bed), this.formatContext)}${entityNumber(printer.bedTarget) !== null && (entityNumber(printer.bedTarget) ?? 0) > 0 ? ` → ${formatTemperature(entityNumber(printer.bedTarget), this.formatContext)}` : ""}`,
           printer.bed?.entity_id,
         ),
         this.dataRow(
           "Chamber",
-          `${formatTemperature(entityNumber(printer.chamber))}${entityNumber(printer.chamberTarget) !== null && (entityNumber(printer.chamberTarget) ?? 0) > 0 ? ` → ${formatTemperature(entityNumber(printer.chamberTarget))}` : ""}`,
+          `${formatTemperature(entityNumber(printer.chamber), this.formatContext)}${entityNumber(printer.chamberTarget) !== null && (entityNumber(printer.chamberTarget) ?? 0) > 0 ? ` → ${formatTemperature(entityNumber(printer.chamberTarget), this.formatContext)}` : ""}`,
           printer.chamber?.entity_id,
         ),
         printer.leftNozzle
           ? this.dataRow(
               "Left nozzle",
-              `${formatTemperature(entityNumber(printer.leftNozzle))} → ${formatTemperature(entityNumber(printer.leftNozzleTarget))}`,
+              `${formatTemperature(entityNumber(printer.leftNozzle), this.formatContext)} → ${formatTemperature(entityNumber(printer.leftNozzleTarget), this.formatContext)}`,
               printer.leftNozzle.entity_id,
             )
           : nothing,
         printer.rightNozzle
           ? this.dataRow(
               "Right nozzle",
-              `${formatTemperature(entityNumber(printer.rightNozzle))} → ${formatTemperature(entityNumber(printer.rightNozzleTarget))}`,
+              `${formatTemperature(entityNumber(printer.rightNozzle), this.formatContext)} → ${formatTemperature(entityNumber(printer.rightNozzleTarget), this.formatContext)}`,
               printer.rightNozzle.entity_id,
             )
           : nothing,
         printer.nozzle
           ? this.dataRow(
               "Nozzle (reported)",
-              `${formatTemperature(entityNumber(printer.nozzle))} → ${formatTemperature(entityNumber(printer.nozzleTarget))}`,
+              `${formatTemperature(entityNumber(printer.nozzle), this.formatContext)} → ${formatTemperature(entityNumber(printer.nozzleTarget), this.formatContext)}`,
               printer.nozzle.entity_id,
             )
           : nothing,
@@ -2389,17 +2448,17 @@ export class BambuPrinterCard extends LitElement {
           : nothing,
       ])}
       ${this.group("Fans", [
-        this.dataRow("Part cooling", formatPercent(entityNumber(printer.coolingFan)), printer.coolingFan?.entity_id),
-        this.dataRow("Auxiliary", formatPercent(entityNumber(printer.auxFan)), printer.auxFan?.entity_id),
-        this.dataRow("Chamber", formatPercent(entityNumber(printer.chamberFan)), printer.chamberFan?.entity_id),
-        this.dataRow("Heatbreak", formatPercent(entityNumber(printer.heatbreakFan)), printer.heatbreakFan?.entity_id),
+        this.dataRow("Part cooling", formatPercent(entityNumber(printer.coolingFan), this.formatContext), printer.coolingFan?.entity_id),
+        this.dataRow("Auxiliary", formatPercent(entityNumber(printer.auxFan), this.formatContext), printer.auxFan?.entity_id),
+        this.dataRow("Chamber", formatPercent(entityNumber(printer.chamberFan), this.formatContext), printer.chamberFan?.entity_id),
+        this.dataRow("Heatbreak", formatPercent(entityNumber(printer.heatbreakFan), this.formatContext), printer.heatbreakFan?.entity_id),
       ])}
       ${this.group("Power & cost", [
         this.dataRow(
           "Current print cost",
           quote ? this.cost(quote.cost) : "—",
         ),
-        this.dataRow("Energy", quote ? formatEnergy(quote.energy) : "—"),
+        this.dataRow("Energy", quote ? formatEnergy(quote.energy, this.formatContext) : "—"),
         this.dataRow(
           "Average tariff",
           quote?.averagePrice !== null && quote
@@ -2413,12 +2472,12 @@ export class BambuPrinterCard extends LitElement {
             : "—",
           printer.price?.entity_id,
         ),
-        this.dataRow("Power", formatPower(powerWatts(printer.power)), printer.power?.entity_id),
-        this.dataRow("Current", formatCurrent(currentAmps(printer.current)), printer.current?.entity_id),
-        this.dataRow("Voltage", formatVoltage(asNumber(printer.voltage?.state)), printer.voltage?.entity_id),
+        this.dataRow("Power", formatPower(powerWatts(printer.power), this.formatContext), printer.power?.entity_id),
+        this.dataRow("Current", formatCurrent(currentAmps(printer.current), this.formatContext), printer.current?.entity_id),
+        this.dataRow("Voltage", formatVoltage(asNumber(printer.voltage?.state), this.formatContext), printer.voltage?.entity_id),
         this.dataRow(
           "Plug energy total",
-          printer.energy ? formatEnergy(energyKwh(printer.energy)) : "—",
+          printer.energy ? formatEnergy(energyKwh(printer.energy), this.formatContext) : "—",
           printer.energy?.entity_id,
         ),
       ])}
@@ -2448,7 +2507,7 @@ export class BambuPrinterCard extends LitElement {
         ...printer.ams.map((unit) =>
           this.dataRow(
             unit.label,
-            `${unit.trays.filter((tray) => !tray.empty).length} loaded · ${formatTemperature(entityNumber(unit.temperature))} · ${formatPercent(entityNumber(unit.humidity))}${unit.active ? " · active" : ""}${unit.drying ? " · drying" : ""}`,
+            `${unit.trays.filter((tray) => !tray.empty).length} loaded · ${formatTemperature(entityNumber(unit.temperature), this.formatContext)} · ${formatPercent(entityNumber(unit.humidity), this.formatContext)}${unit.active ? " · active" : ""}${unit.drying ? " · drying" : ""}`,
           ),
         ),
         ...printer.external.map((spool) =>
@@ -2555,7 +2614,7 @@ export class BambuPrinterCard extends LitElement {
         </div>
         <div class="stat">
           <span class="stat-label">Electricity used</span>
-          <strong class="stat-value">${formatEnergy(totalEnergy)}</strong>
+          <strong class="stat-value">${formatEnergy(totalEnergy, this.formatContext)}</strong>
           <span class="stat-sub"
             >${days} day recorder window</span
           >
@@ -2578,7 +2637,7 @@ export class BambuPrinterCard extends LitElement {
               quoted.reduce(
                 (total, item) => total + (item.quote?.pricedEnergy ?? 0),
                 0,
-              ),
+              ), this.formatContext,
             )}</strong
           >
           <span class="stat-sub"
@@ -2631,7 +2690,7 @@ export class BambuPrinterCard extends LitElement {
             </div>`
           : sessions.length
             ? html`<div class="history-list">
-                ${quoted.map(({ session, quote }) =>
+                ${repeat(quoted, ({ session }) => session.start, ({ session, quote }) =>
                   this.renderRecord(session, quote),
                 )}
               </div>`
@@ -2683,7 +2742,7 @@ export class BambuPrinterCard extends LitElement {
         <span class="record-value">
           <strong>${cost}</strong>
           <small
-            >${quote ? formatEnergy(quote.energy) : "No energy sensor"} ·
+            >${quote ? formatEnergy(quote.energy, this.formatContext) : "No energy sensor"} ·
             ${statusText}${session.partialStart || session.partialEnd
               ? " · partial"
               : ""}</small
@@ -2705,7 +2764,7 @@ export class BambuPrinterCard extends LitElement {
           : nothing}
         ${quote && quote.unpricedEnergy > 0
           ? html`<p>
-              ${formatEnergy(quote.unpricedEnergy)} had no recorded tariff.
+              ${formatEnergy(quote.unpricedEnergy, this.formatContext)} had no recorded tariff.
             </p>`
           : nothing}
         ${quote?.gaps

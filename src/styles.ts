@@ -7,6 +7,7 @@ import {
   headerStyles,
   metricStyles,
   navigationStyles,
+  telemetryStyles,
 } from "@bitosome/ha-card-ui";
 
 export const cardStyles = [
@@ -14,6 +15,7 @@ export const cardStyles = [
   headerStyles,
   metricStyles,
   navigationStyles,
+  telemetryStyles,
   dialogStyles,
   glowStyles,
   componentStyles,
@@ -79,11 +81,6 @@ export const cardStyles = [
     }
 
     /* Header ------------------------------------------------------------- */
-    .family-header {
-      padding: 4px 2px 0;
-      align-items: flex-start;
-      gap: 10px;
-    }
     .family-brand {
       background: color-mix(in srgb, var(--primary-color) 11%, transparent);
       color: var(--primary-color);
@@ -95,58 +92,7 @@ export const cardStyles = [
       gap: 6px 8px;
       min-width: 0;
     }
-    .family-title {
-      font-size: 19px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      margin: 0;
-      line-height: 1.2;
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-    .family-subtitle {
-      margin-top: 3px;
-      font-size: 11.5px;
-      line-height: 1.4;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .family-subtitle .sep {
-      opacity: 0.55;
-    }
-    .status-chip {
-      --status-color: var(--secondary-text-color);
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      min-height: 24px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      color: var(--status-color);
-      background: color-mix(
-        in srgb,
-        var(--status-color) 12%,
-        var(--family-surface)
-      );
-      font-size: 11px;
-      font-weight: 650;
-      line-height: 1.3;
-      white-space: nowrap;
-    }
-    .status-chip[data-tone="accent"] {
-      --status-color: var(--status-active-color);
-    }
-    .status-chip[data-tone="success"] {
-      --status-color: var(--status-success-color);
-    }
-    .status-chip[data-tone="warning"] {
-      --status-color: var(--status-warn-color);
-    }
-    .status-chip[data-tone="error"] {
-      --status-color: var(--status-alert-color);
-    }
+    .family-title { margin: 0; }
     .status-dot {
       width: 6px;
       height: 6px;
@@ -154,7 +100,6 @@ export const cardStyles = [
       background: currentColor;
       flex: 0 0 6px;
     }
-    .status-chip[data-tone="accent"] .status-dot,
     .live-pill .status-dot {
       animation: statusPulse 2.4s ease-in-out infinite;
     }
@@ -353,7 +298,7 @@ export const cardStyles = [
         transform: scale(1.04);
       }
     }
-    .hero-art ha-icon {
+    .hero-art > ha-icon {
       width: 28px;
       height: 28px;
       --mdc-icon-size: 28px;
@@ -379,12 +324,14 @@ export const cardStyles = [
       );
       text-align: start;
     }
+    @media (hover: hover) {
     .cost-button:hover {
       background: color-mix(
         in srgb,
         var(--primary-text-color) 7%,
         transparent
       );
+    }
     }
     .cost-icon {
       width: 34px;
@@ -410,7 +357,7 @@ export const cardStyles = [
       gap: 1px;
     }
     .cost-label {
-      font-size: 10.5px;
+      font-size: 12px;
       color: var(--secondary-text-color);
       line-height: 1.3;
       white-space: nowrap;
@@ -431,7 +378,7 @@ export const cardStyles = [
       letter-spacing: 0;
     }
     .cost-note {
-      font-size: 10.5px;
+      font-size: 12px;
       color: var(--secondary-text-color);
       line-height: 1.35;
       overflow-wrap: anywhere;
@@ -460,7 +407,17 @@ export const cardStyles = [
       border-radius: 12px;
       background: #0b0e14;
     }
+    .camera-frame:fullscreen {
+      width: 100vw;
+      height: 100dvh;
+      aspect-ratio: auto;
+      border-radius: 0;
+    }
+    .camera-frame:fullscreen .camera-overlay {
+      inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) auto max(8px, env(safe-area-inset-left));
+    }
     .camera-frame ha-camera-stream,
+    .camera-frame ha-web-rtc-player,
     .camera-frame .camera-image {
       display: block;
       width: 100%;
@@ -512,7 +469,7 @@ export const cardStyles = [
       border-radius: 999px;
       background: rgba(5, 8, 12, 0.72);
       color: #fff;
-      font-size: 10.5px;
+      font-size: 12px;
       font-weight: 650;
       letter-spacing: 0.01em;
       backdrop-filter: blur(6px);
@@ -556,7 +513,7 @@ export const cardStyles = [
       gap: 8px;
       pointer-events: none;
       color: rgba(255, 255, 255, 0.72);
-      font-size: 10.5px;
+      font-size: 12px;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
     }
 
@@ -569,40 +526,10 @@ export const cardStyles = [
         --family-metric-columns: 4;
       }
     }
-    .metric {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      gap: 6px;
-      text-align: start;
-      min-height: 108px;
-      color: inherit;
-    }
-    .metric-head {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-      color: var(--secondary-text-color);
-      font-size: 10.5px;
-      line-height: 1.3;
-      font-weight: 600;
-    }
-    .metric-head ha-icon {
-      width: 17px;
-      height: 17px;
-      --mdc-icon-size: 17px;
-      flex: 0 0 17px;
-    }
-    .metric-head span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .metric .family-metric-value {
-      align-self: end;
-    }
+    /* Shared metric geometry, with one printer-specific target/hint row. */
+    .metric { text-align: start; }
     .metric-sub {
-      font-size: 10.5px;
+      font-size: 12px;
       line-height: 1.35;
       color: var(--secondary-text-color);
       font-variant-numeric: tabular-nums;
@@ -610,64 +537,11 @@ export const cardStyles = [
     }
 
     /* Telemetry ---------------------------------------------------------- */
-    .telemetry {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1px;
-      overflow: hidden;
-      border-radius: var(--tile-border-radius, 16px);
-      background: color-mix(
-        in srgb,
-        var(--primary-text-color) 7%,
-        transparent
-      );
-    }
+    .telemetry { --family-telemetry-columns: 2; }
+    .telemetry-cell:nth-child(2n) { border-inline-end: 0; }
     @container (min-width: 560px) {
-      .telemetry {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-    }
-    .telemetry-cell {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 4px;
-      width: 100%;
-      min-width: 0;
-      min-height: 56px;
-      padding: 9px 12px;
-      border: 0;
-      background: var(--family-tile);
-      text-align: start;
-      font: inherit;
-      color: inherit;
-    }
-    button.telemetry-cell {
-      cursor: pointer;
-    }
-    @media (hover: hover) {
-      button.telemetry-cell:hover {
-        background: color-mix(
-          in srgb,
-          var(--primary-text-color) 6%,
-          var(--family-tile)
-        );
-      }
-    }
-    .telemetry-label {
-      color: var(--secondary-text-color);
-      font-size: 10.5px;
-      line-height: 1.3;
-      overflow-wrap: anywhere;
-    }
-    .telemetry-value {
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 1.3;
-      font-variant-numeric: tabular-nums;
-      overflow-wrap: anywhere;
+      .telemetry { --family-telemetry-columns: 4; }
+      .telemetry-cell:nth-child(2) { border-inline-end: 1px solid var(--divider-color); }
     }
 
     /* Chart -------------------------------------------------------------- */
@@ -792,7 +666,7 @@ export const cardStyles = [
         var(--primary-text-color) 6%,
         transparent
       );
-      font-size: 10.5px;
+      font-size: 12px;
       font-weight: 600;
       line-height: 1.3;
       white-space: nowrap;
@@ -844,7 +718,7 @@ export const cardStyles = [
     .ams-env {
       margin-left: auto;
       color: var(--secondary-text-color);
-      font-size: 10.5px;
+      font-size: 12px;
       line-height: 1.35;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -908,12 +782,14 @@ export const cardStyles = [
     .tray.empty {
       opacity: 0.55;
     }
+    @media (hover: hover) {
     .tray:hover {
       background: color-mix(
         in srgb,
         var(--primary-text-color) 6%,
         transparent
       );
+    }
     }
     .tray-swatch {
       width: 26px;
@@ -1275,7 +1151,7 @@ export const cardStyles = [
       min-width: 0;
     }
     .stat-label {
-      font-size: 10.5px;
+      font-size: 12px;
       line-height: 1.3;
       color: var(--secondary-text-color);
     }
@@ -1311,7 +1187,7 @@ export const cardStyles = [
     }
     .history-chart-head span {
       color: var(--secondary-text-color);
-      font-size: 10.5px;
+      font-size: 12px;
     }
     .history-list {
       display: grid;
@@ -1380,7 +1256,7 @@ export const cardStyles = [
     }
     .record-copy small,
     .record-value small {
-      font-size: 10.5px;
+      font-size: 12px;
       line-height: 1.4;
       color: var(--secondary-text-color);
       font-variant-numeric: tabular-nums;
@@ -1445,7 +1321,7 @@ export const cardStyles = [
     }
     .dialog-footer small {
       color: var(--secondary-text-color);
-      font-size: 10.5px;
+      font-size: 12px;
       line-height: 1.4;
     }
     .family-dialog-header h2 {
@@ -1548,7 +1424,9 @@ export const cardStyles = [
     }
     @container (max-width: 340px) {
       .hero-art {
-        display: none;
+        width: 56px;
+        height: 56px;
+        flex-basis: 56px;
       }
       .hero-task {
         font-size: 19px;

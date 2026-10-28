@@ -84,7 +84,7 @@ check("renders a ha-card", !!root?.querySelector("ha-card"));
 check(
   "header shows the printer and printing state",
   text(root?.querySelector(".family-title")) === "H2D" &&
-    text(root?.querySelector(".status-chip")).includes("Printing"),
+    text(root?.querySelector(".family-chip")).includes("Printing"),
 );
 check(
   "hero shows the current task and progress",
@@ -215,6 +215,18 @@ check(
 );
 check("no printer or HA service was called", serviceCalls.length === 0);
 
+// Camera uses the family dialog on all platforms, including iOS without
+// the Fullscreen API, and never creates a second concurrent live stream.
+const cameraOpener = root.querySelector('[aria-label="Expand camera"]');
+cameraOpener.click();
+await tick(100);
+check("expanded camera uses shared dialog with X dismissal", !!root.querySelector('dialog[open] .camera-frame') && !!root.querySelector('dialog[open] [title="Close"]'));
+check("expanded camera keeps only one live player", root.querySelectorAll('ha-camera-stream, ha-web-rtc-player').length === 1);
+root.querySelector('dialog [title="Close"]').click();
+await tick(100);
+check("camera dialog restores opener focus", root.activeElement === cameraOpener);
+check("camera returns to overview after closing", !!root.querySelector('.overview-grid ha-camera-stream') && !root.querySelector('dialog'));
+
 // History dialog -----------------------------------------------------------
 root?.querySelector(".cost-button")?.click();
 await tick(1000);
@@ -254,10 +266,8 @@ dialog = root?.querySelector("dialog.family-dialog");
 const detailsText = text(dialog);
 check("details dialog opens", !!dialog && dialog.open === true);
 check(
-  "details identify the card as read-only",
-  detailsText.includes("Printer details") &&
-    detailsText.includes("Read-only printer telemetry") &&
-    detailsText.includes("never sends a printer command"),
+  "details provide print history without technical filler",
+  detailsText.includes("Printer details") && detailsText.includes("View print history"),
 );
 check(
   "details show print job, elapsed time and formatted material data",
@@ -288,7 +298,7 @@ card.hass = { ...hass, states: offlineStates };
 await tick(400);
 check(
   "offline status is explicit, not stale printing data",
-  text(root?.querySelector(".status-chip")).includes("Offline") &&
+  text(root?.querySelector(".family-chip")).includes("Offline") &&
     text(root?.querySelector(".notices")).toLowerCase().includes("offline"),
 );
 
@@ -301,7 +311,7 @@ card.hass = { ...hass, states: unavailableStates };
 await tick(400);
 check(
   "unavailable status is explicit",
-  text(root?.querySelector(".status-chip")).includes("Unavailable") &&
+  text(root?.querySelector(".family-chip")).includes("Unavailable") &&
     text(root?.querySelector(".notices")).toLowerCase().includes("offline"),
 );
 

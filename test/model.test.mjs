@@ -5,6 +5,14 @@ import {
   buildChartBuckets,
   deriveSessions,
   formatCurrency,
+  formatNumber,
+  formatPrice,
+  formatEnergy,
+  formatCurrent,
+  formatClock,
+  formatTime,
+  formatDateTime,
+  localeContext,
   formatDuration,
   historyPath,
   liveQuote,
@@ -189,6 +197,99 @@ check("energy fallback costs cumulative deltas", () => {
   assert.ok(Math.abs(quote.cost - (0.5 * 0.1 + 0.5 * 0.2)) < 1e-9);
 });
 
+check("tariff changes cannot hide stale power or manufacture energy", () => {
+  const hour = 3_600_000;
+  const session = { start: 0, end: 3 * hour };
+  const power = [{ t: 0, v: 1000 }];
+  const prices = Array.from({ length: 12 }, (_, index) => ({
+    t: index * hour / 4, v: 0.2,
+  }));
+  const quote = quotePower(session, power, prices);
+  assert.ok(Math.abs(quote.energy - 1) < 1e-9);
+  assert.ok(Math.abs(quote.cost - 0.2) < 1e-9);
+  assert.equal(quote.complete, false);
+  assert.equal(quote.gaps, true);
+  assert.equal(quotePower({ start: 2 * hour, end: 3 * hour }, power, prices).energy, 0);
+});
+
+check("power gaps shorter than a minute still mark cost partial", () => {
+  const quote = quotePower({ start: 0, end: 120000 }, [
+    { t: 0, v: 600 }, { t: 30000, v: null }, { t: 60000, v: 600 },
+  ], [{ t: 0, v: 0.2 }]);
+  assert.equal(quote.complete, false);
+  assert.ok(Math.abs(quote.energy - 0.015) < 1e-9);
+});
+
+check("cumulative deltas split tariffs instead of repricing the whole delta", () => {
+  const hour = 3_600_000;
+  const quote = quoteEnergy({ start: 0, end: hour }, [
+    { t: 0, v: 10 }, { t: hour, v: 11 },
+  ], [{ t: 0, v: 0.1 }, { t: hour / 2, v: 0.3 }]);
+  assert.ok(Math.abs(quote.energy - 1) < 1e-9);
+  assert.ok(Math.abs(quote.cost - 0.2) < 1e-9);
+  assert.equal(quote.complete, true);
+});
+
+check("cumulative estimates clip print boundaries without counting standby", () => {
+  const hour = 3_600_000;
+  const quote = quoteEnergy({ start: hour / 4, end: 3 * hour / 4 }, [
+    { t: 0, v: 10 }, { t: hour, v: 11 },
+  ], [{ t: 0, v: 0.2 }]);
+  assert.ok(Math.abs(quote.energy - 0.5) < 1e-9);
+  assert.ok(Math.abs(quote.cost - 0.1) < 1e-9);
+  assert.equal(quote.complete, true);
+});
+
+check("a missing cumulative tail stays partial instead of being free", () => {
+  const hour = 3_600_000;
+  const quote = quoteEnergy({ start: 0, end: hour }, [
+    { t: 0, v: 10 }, { t: hour / 2, v: 10.5 },
+  ], [{ t: 0, v: 0.2 }]);
+  assert.ok(Math.abs(quote.energy - 0.5) < 1e-9);
+  assert.equal(quote.gaps, true);
+  assert.equal(quote.complete, false);
+  assert.equal(quoteEnergy({ start: 0, end: hour }, [{ t: 0, v: 10 }], []).complete, false);
+});
+
+check("meter reset and unknown readings never bridge a cumulative interval", () => {
+  const minute = 60_000;
+  const quote = quoteEnergy({ start: 0, end: 4 * minute }, [
+    { t: 0, v: 10 }, { t: minute, v: null }, { t: 2 * minute, v: 11 },
+    { t: 3 * minute, v: 0 }, { t: 4 * minute, v: 0.1 },
+  ], [{ t: 0, v: 0.2 }]);
+  assert.equal(quote.energy, 0.1);
+  assert.equal(quote.complete, false);
+});
+
+check("meter staleness is measured between meter readings despite tariff changes", () => {
+  const hour = 3_600_000;
+  const quote = quoteEnergy({ start: 0, end: 8 * hour }, [
+    { t: 0, v: 10 }, { t: 8 * hour, v: 12 },
+  ], Array.from({ length: 8 }, (_, index) => ({ t: index * hour, v: 0.2 })));
+  assert.equal(quote.energy, 0);
+  assert.equal(quote.complete, false);
+});
+
+check("negative tariffs and unavailable tariff intervals retain their meaning", () => {
+  const hour = 3_600_000;
+  const quote = quoteEnergy({ start: 0, end: hour }, [
+    { t: 0, v: 10 }, { t: hour, v: 11 },
+  ], [{ t: 0, v: -0.2 }, { t: hour / 2, v: null }]);
+  assert.ok(Math.abs(quote.energy - 1) < 1e-9);
+  assert.ok(Math.abs(quote.cost + 0.1) < 1e-9);
+  assert.ok(Math.abs(quote.unpricedEnergy - 0.5) < 1e-9);
+  assert.equal(quote.complete, false);
+});
+
+check("missing live power marks partial even with regular updates", () => {
+  const accumulated = addLiveSample({
+    energy: 0, cost: 0, unpricedEnergy: 0, lastAt: 1,
+    lastPower: null, lastPrice: 0.2, gaps: false,
+  }, 10001, 600, 0.2);
+  assert.equal(accumulated.energy, 0);
+  assert.equal(liveQuote(accumulated).complete, false);
+});
+
 check("live samples accumulate and cap stale gaps", () => {
   let accumulator = {
     energy: 0,
@@ -300,6 +401,59 @@ check("formatting stays readable", () => {
   assert.match(formatCurrency(0.42, { currency: "EUR", locale: "en-US" }), /0\.42/);
   assert.equal(formatDuration(90 * 60_000), "1h 30m");
   assert.equal(formatDuration(42 * 1000), "1m");
+});
+
+check("HA numeric preferences override UI language consistently", () => {
+  assert.equal(formatNumber(1234.5, 1, { locale: "en-US", numberFormat: "decimal_comma" }), "1.234,5");
+  assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "comma_decimal" }), "1,234.5");
+  assert.match(formatNumber(1234.5, 1, { numberFormat: "space_comma" }), /^1[\s\u202f]234,5$/);
+  assert.equal(formatNumber(1234.5, 1, { numberFormat: "quote_decimal" }), "1’234.5");
+  assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "none" }), "1234.5");
+  assert.equal(formatNumber(1234.5, 1, { locale: "de-DE", numberFormat: "language" }), "1.234,5");
+  assert.equal(formatNumber(1234.5, 1, { locale: "invalid_locale", numberFormat: "system" }), new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(1234.5));
+});
+
+check("money, tariff and unit values use the same numeric preference", () => {
+  const context = { locale: "en-US", numberFormat: "decimal_comma", currency: "EUR" };
+  assert.match(formatCurrency(1234.5, context), /1\.234,50/);
+  assert.equal(formatCurrency(1234.5, { ...context, currency: undefined }), "1.234,50");
+  assert.equal(formatPrice(-0.125, context), "-0,125");
+  assert.equal(formatEnergy(0.005, context), "<0,01 kWh");
+  assert.equal(formatCurrent(1.25, context), "1,25 A");
+});
+
+check("explicit 12/24 hour preferences apply to clock and dated times", () => {
+  const afternoon = t("2026-10-27T15:30:00Z");
+  const context = { locale: "en-US", timeZone: "UTC", timeFormat: "24" };
+  assert.equal(formatTime(afternoon, context), "15:30");
+  assert.equal(formatClock(afternoon, context), "15:30");
+  assert.match(formatDateTime(afternoon, context), /15:30/);
+  assert.equal(formatClock(t("2026-10-27T00:00:00Z"), context), "00:00");
+  assert.match(formatClock(afternoon, { ...context, timeFormat: "12" }), /03:30\s*PM/);
+  assert.equal(formatClock(afternoon, { ...context, locale: "de-DE", timeFormat: "language" }), "15:30");
+});
+
+check("HA server/local timezone preference resolves without losing timezone", () => {
+  const hass = {
+    locale: { language: "en-US", time_zone: "server", number_format: "none", time_format: "24" },
+    config: { time_zone: "Europe/Tallinn" },
+  };
+  const server = localeContext(hass, undefined, "EUR");
+  assert.equal(server.timeZone, "Europe/Tallinn");
+  assert.equal(server.numberFormat, "none");
+  assert.equal(server.timeFormat, "24");
+  assert.equal(formatClock(t("2026-10-27T15:30:00Z"), server), "17:30");
+  const local = localeContext({ ...hass, locale: { ...hass.locale, time_zone: "local" } }, undefined, "EUR");
+  assert.equal(local.timeZone, undefined);
+  const explicit = localeContext({ ...hass, locale: { ...hass.locale, time_zone: "Europe/London" } }, undefined, "EUR");
+  assert.equal(explicit.timeZone, "Europe/London");
+});
+
+check("system clock preference selects browser hour cycle, keeps display language", () => {
+  const afternoon = t("2026-10-27T15:30:00Z");
+  const cycle = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hourCycle;
+  const context = { locale: "en-US", timeZone: "UTC", timeFormat: "system" };
+  assert.equal(formatClock(afternoon, context), formatClock(afternoon, { ...context, timeFormat: cycle === "h11" || cycle === "h12" ? "12" : "24" }));
 });
 
 check("state points sort and collapse duplicate timestamps", () => {

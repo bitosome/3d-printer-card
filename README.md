@@ -18,7 +18,7 @@ printer was contacted.</sub>
   weight and length, speed profile and the current print's cover image. Tap the
   cover image for a full print preview.
 - **Live camera** — the same Home Assistant camera/WebRTC elements used by the
-  custom camera card, with a fullscreen control, a loading state, a still-image
+  custom camera card, with native fullscreen and an expandable shared-dialog fallback, a loading state, a still-image
   fallback and a live/snapshot toggle.
 - **Print cost** — current or last print electricity estimate, energy used and
   weighted average tariff. Tap it for the full print history.
@@ -180,8 +180,12 @@ Print cost is an **estimate**, not a billing-meter guarantee.
    from Home Assistant state changes. It re-seeds after five minutes, when the
    tab becomes visible, and whenever the card has to recover from a background
    gap. When a print ends, the completed record is recomputed from Recorder.
-6. The cumulative plug energy sensor is used only when no power sensor is
-   configured; its sparse updates make it a less accurate cost basis.
+6. Cumulative plug energy is the fallback when power history is absent. Each
+   observed meter delta is allocated uniformly between its two readings to
+   estimate the part inside the print and split tariff changes. It never
+   extrapolates past the last reading. Missing boundary readings, counter
+   resets, unavailable data or intervals over six hours make the estimate
+   partial; sparse meter updates cannot reveal the exact timing of consumption.
 
 The tariff sensor is used as recorded. If that sensor already includes fees and
 VAT, the card adds nothing; if it does not, neither does the card. Electricity

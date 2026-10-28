@@ -58,7 +58,7 @@ export class BambuPrinterCardEditor extends LitElement {
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
       font: inherit;
-      font-size: 14px;
+      font-size: 16px;
     }
     input:focus-visible {
       outline: 3px solid var(--primary-color);
@@ -154,9 +154,11 @@ export class BambuPrinterCardEditor extends LitElement {
     return html`<div class="row">
       <div class="row-copy">
         <strong>${label}</strong>
-        <small>${helper}</small>
+        <small id=${`toggle-help-${key}`}>${helper}</small>
       </div>
       <ha-switch
+        aria-label=${label}
+        aria-describedby=${`toggle-help-${key}`}
         .checked=${this.config[key] !== false}
         @change=${(event: Event) =>
           this.patchConfig({

@@ -763,27 +763,39 @@ function finalizeQuote(quote: Quote): Quote {
   return quote;
 }
 
-interface TimedEvent {
-  t: number;
-  power?: number | null;
-  price?: number | null;
-  energy?: number | null;
-}
-
-function mergedTimes(events: TimedEvent[], start: number, end: number): number[] {
-  const times = new Set<number>([start, end]);
-  for (const event of events) {
-    if (event.t > start && event.t < end) times.add(event.t);
-  }
-  return [...times].sort((a, b) => a - b);
+/** Price observed energy at the tariff that applied during each subinterval.
+ * The cursor advances once across the sorted tariff history, avoiding quadratic
+ * scans for high-frequency smart-plug history.
+ */
+function energyPricer(quote: Quote, prices: SeriesPoint[]) {
+  let index = 0;
+  let price: number | null = null;
+  return (start: number, end: number, energyPerMs: number) => {
+    let at = start;
+    while (index < prices.length && prices[index].t <= at) {
+      price = prices[index++].v;
+    }
+    while (at < end) {
+      const until = Math.min(end, prices[index]?.t ?? end);
+      const energy = energyPerMs * (until - at);
+      quote.energy += energy;
+      if (price === null || !Number.isFinite(price)) {
+        quote.unpricedEnergy += energy;
+      } else {
+        quote.cost += energy * price;
+      }
+      at = until;
+      while (index < prices.length && prices[index].t <= at) {
+        price = prices[index++].v;
+      }
+    }
+  };
 }
 
 /**
- * Integrate a sample-and-hold power series against a step price series.
- *
- * Power is W, price is currency/kWh. Missing prices accumulate as unpriced
- * energy; missing power or suspiciously long powered intervals are reported as
- * gaps rather than silently integrated.
+ * Integrate sample-and-hold power (W) against step tariffs (currency/kWh).
+ * Power freshness is measured from its own sample timestamp, never from a
+ * tariff change. Unobserved/invalid intervals remain gaps, not free energy.
  */
 export function quotePower(
   session: Pick<PrintSession, "start" | "end">,
@@ -791,67 +803,34 @@ export function quotePower(
   price: SeriesPoint[],
 ): Quote {
   const quote = emptyQuote();
-  const start = session.start;
+  const { start } = session;
   const end = Math.max(start, session.end);
   if (!(end > start)) return finalizeQuote(quote);
-  const duration = end - start;
-
-  const powerEvents: TimedEvent[] = power.map((point) => ({
-    t: point.t,
-    power: point.v,
-  }));
-  const priceEvents: TimedEvent[] = price.map((point) => ({
-    t: point.t,
-    price: point.v,
-  }));
-  const events = [...powerEvents, ...priceEvents].sort((a, b) => a.t - b.t);
-  const times = mergedTimes(events, start, end);
-
-  let currentPower: number | null =
-    lastAtOrBefore(power, start)?.v ?? null;
-  let currentPrice: number | null =
-    lastAtOrBefore(price, start)?.v ?? null;
-  let previous = start;
-  let sawPower = currentPower !== null;
-
-  const integrate = (to: number) => {
-    const dt = to - previous;
-    if (dt <= 0) return;
-    if (currentPower === null) {
-      if (dt > 60_000 && duration > MIN_SESSION_MS) quote.gaps = true;
-      return;
-    }
-    sawPower = true;
-    if (dt > MAX_POWER_GAP_MS && Math.abs(currentPower) > 2) {
-      quote.gaps = true;
-      return;
-    }
-    const energy = (currentPower * dt) / 3_600_000 / 1000;
-    quote.energy += energy;
-    if (currentPrice === null) {
-      quote.unpricedEnergy += Math.abs(energy);
-    } else {
-      quote.cost += energy * currentPrice;
-    }
-  };
-
-  for (const time of times) {
-    if (time > previous) integrate(time);
-    for (const event of events) {
-      if (event.t !== time) continue;
-      if (event.power !== undefined) currentPower = event.power;
-      if (event.price !== undefined) currentPrice = event.price;
-    }
-    previous = time;
+  const addEnergy = energyPricer(quote, price);
+  let covered = 0;
+  for (let index = 0; index < power.length; index++) {
+    const sample = power[index];
+    if (sample.t >= end) break;
+    const from = Math.max(start, sample.t);
+    const until = Math.min(end, power[index + 1]?.t ?? end);
+    if (until <= from) continue;
+    if (sample.v === null || !Number.isFinite(sample.v) || sample.v < 0) continue;
+    const freshUntil = sample.v > 2
+      ? Math.min(until, sample.t + MAX_POWER_GAP_MS)
+      : until;
+    if (freshUntil <= from) continue;
+    addEnergy(from, freshUntil, sample.v / 3_600_000 / 1000);
+    covered += freshUntil - from;
   }
-
-  if (!sawPower && duration > MIN_SESSION_MS) quote.gaps = true;
+  quote.gaps = covered < end - start;
   return finalizeQuote(quote);
 }
 
 /**
- * Fallback accounting from a cumulative energy sensor. Used only when no power
- * sensor is configured; recorder sampling still determines accuracy.
+ * Estimate consumption between adjacent cumulative energy readings. Each
+ * observed delta is allocated uniformly in time to clip print boundaries and
+ * split tariff changes. Nothing is extrapolated beyond the last meter reading.
+ * Resets, unavailable readings and long intervals are reported as gaps.
  */
 export function quoteEnergy(
   session: Pick<PrintSession, "start" | "end">,
@@ -859,66 +838,28 @@ export function quoteEnergy(
   price: SeriesPoint[],
 ): Quote {
   const quote = emptyQuote();
-  const start = session.start;
+  const { start } = session;
   const end = Math.max(start, session.end);
   if (!(end > start)) return finalizeQuote(quote);
-
-  const energyEvents: TimedEvent[] = energy.map((point) => ({
-    t: point.t,
-    energy: point.v,
-  }));
-  const priceEvents: TimedEvent[] = price.map((point) => ({
-    t: point.t,
-    price: point.v,
-  }));
-  const events = [...energyEvents, ...priceEvents].sort((a, b) => a.t - b.t);
-  const times = mergedTimes(events, start, end);
-
-  let previous = start;
-  let previousEnergy: number | null = lastAtOrBefore(energy, start)?.v ?? null;
-  let currentPrice: number | null = lastAtOrBefore(price, start)?.v ?? null;
-
-  for (const time of times) {
-    let nextEnergy: number | null | undefined;
-    let nextPrice: number | null | undefined;
-    for (const event of events) {
-      if (event.t !== time) continue;
-      if (event.energy !== undefined) nextEnergy = event.energy;
-      if (event.price !== undefined) nextPrice = event.price;
-    }
-    if (time > previous) {
-      const dt = time - previous;
-      if (nextEnergy !== undefined && nextEnergy !== null) {
-        if (previousEnergy === null) {
-          if (dt > 60_000) quote.gaps = true;
-        } else {
-          const delta = nextEnergy - previousEnergy;
-          if (delta < -0.0001) {
-            quote.gaps = true;
-          } else if (delta >= 0) {
-            if (dt > MAX_ENERGY_GAP_MS && delta > 0.1) {
-              quote.gaps = true;
-            } else {
-              quote.energy += delta;
-              if (currentPrice === null) {
-                quote.unpricedEnergy += delta;
-              } else {
-                quote.cost += delta * currentPrice;
-              }
-            }
-          }
-        }
-      } else if (dt > MAX_ENERGY_GAP_MS) {
-        quote.gaps = true;
-      }
-    }
-    if (nextEnergy !== undefined) previousEnergy = nextEnergy;
-    // A tariff change applies to the next interval, not retroactively.
-    if (nextPrice !== undefined) currentPrice = nextPrice;
-    previous = time;
+  const addEnergy = energyPricer(quote, price);
+  let covered = 0;
+  for (let index = 1; index < energy.length; index++) {
+    const before = energy[index - 1];
+    const after = energy[index];
+    if (before.t >= end) break;
+    const from = Math.max(start, before.t);
+    const until = Math.min(end, after.t);
+    const duration = after.t - before.t;
+    if (until <= from || duration <= 0) continue;
+    if (
+      before.v === null || after.v === null ||
+      !Number.isFinite(before.v) || !Number.isFinite(after.v) ||
+      before.v < 0 || after.v < before.v || duration > MAX_ENERGY_GAP_MS
+    ) continue;
+    addEnergy(from, until, (after.v - before.v) / duration);
+    covered += until - from;
   }
-
-  if (previousEnergy === null) quote.gaps = true;
+  quote.gaps = covered < end - start;
   return finalizeQuote(quote);
 }
 
@@ -953,12 +894,13 @@ export function addLiveSample(
   const next = { ...accumulator };
   if (accumulator.lastAt > 0) {
     const dt = now - accumulator.lastAt;
-    if (dt > 0 && dt <= maxGapMs && accumulator.lastPower !== null) {
+    if (dt > 0 && dt <= maxGapMs && accumulator.lastPower !== null &&
+      Number.isFinite(accumulator.lastPower) && accumulator.lastPower >= 0) {
       const energy = (accumulator.lastPower * dt) / 3_600_000 / 1000;
       next.energy += energy;
-      if (accumulator.lastPrice === null) next.unpricedEnergy += Math.abs(energy);
+      if (accumulator.lastPrice === null || !Number.isFinite(accumulator.lastPrice)) next.unpricedEnergy += energy;
       else next.cost += energy * accumulator.lastPrice;
-    } else if (dt > maxGapMs) {
+    } else if (dt > 0) {
       next.gaps = true;
     }
   }
@@ -1046,16 +988,34 @@ export interface FormatContext {
   locale?: string;
   timeZone?: string;
   currency?: string;
+  numberFormat?: string;
+  timeFormat?: string;
+}
+
+/** Match Home Assistant's number_format preference independently of language. */
+function numericLocale(context: FormatContext): string | string[] | undefined {
+  switch (context.numberFormat) {
+    case "comma_decimal": return ["en-US", "en"];
+    case "decimal_comma": return ["de", "es", "it"];
+    case "space_comma": return ["fr", "sv", "cs"];
+    case "quote_decimal": return "de-CH";
+    case "none": return "en-US";
+    case "system": return undefined;
+    default: return context.locale || undefined;
+  }
 }
 
 function numberFormat(
   context: FormatContext,
   options: Intl.NumberFormatOptions,
 ): Intl.NumberFormat {
+  const resolved = context.numberFormat === "none"
+    ? { ...options, useGrouping: false }
+    : options;
   try {
-    return new Intl.NumberFormat(context.locale || undefined, options);
+    return new Intl.NumberFormat(numericLocale(context), resolved);
   } catch {
-    return new Intl.NumberFormat(undefined, options);
+    return new Intl.NumberFormat(undefined, resolved);
   }
 }
 
@@ -1064,7 +1024,10 @@ export function formatCurrency(
   context: FormatContext = {},
 ): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  if (!context.currency) return value.toFixed(2);
+  if (!context.currency) return numberFormat(context, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
   const formatter = numberFormat(context, {
     style: "currency",
     currency: context.currency,
@@ -1106,34 +1069,34 @@ export function formatEnergy(
   context: FormatContext = {},
 ): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  if (value > 0 && value < 0.01) return "<0.01 kWh";
+  if (value > 0 && value < 0.01) return `<${formatNumber(0.01, 2, context)} kWh`;
   return `${formatNumber(value, 2, context)} kWh`;
 }
 
-export function formatPower(value: number | null | undefined): string {
+export function formatPower(value: number | null | undefined, context: FormatContext = {}): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  if (Math.abs(value) >= 10000) return `${formatNumber(value / 1000, 1)} kW`;
-  return `${formatNumber(value, 0)} W`;
+  if (Math.abs(value) >= 10000) return `${formatNumber(value / 1000, 1, context)} kW`;
+  return `${formatNumber(value, 0, context)} W`;
 }
 
-export function formatCurrent(value: number | null | undefined): string {
+export function formatCurrent(value: number | null | undefined, context: FormatContext = {}): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return `${formatNumber(value, 2)} A`;
+  return `${formatNumber(value, 2, context)} A`;
 }
 
-export function formatVoltage(value: number | null | undefined): string {
+export function formatVoltage(value: number | null | undefined, context: FormatContext = {}): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return `${formatNumber(value, 0)} V`;
+  return `${formatNumber(value, 0, context)} V`;
 }
 
-export function formatTemperature(value: number | null | undefined): string {
+export function formatTemperature(value: number | null | undefined, context: FormatContext = {}): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return `${formatNumber(value, 1)} °C`;
+  return `${formatNumber(value, 1, context)} °C`;
 }
 
-export function formatPercent(value: number | null | undefined): string {
+export function formatPercent(value: number | null | undefined, context: FormatContext = {}): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return `${formatNumber(value, 0)}%`;
+  return `${formatNumber(value, 0, context)}%`;
 }
 
 export function formatDuration(
@@ -1175,69 +1138,68 @@ export function formatRelative(
   return `${Math.round(delta / 86_400_000)} d ago`;
 }
 
+/** Explicit 24-hour time uses 00:00, never the h24 variant's 24:00. */
+function hourCycle(context: FormatContext): Intl.DateTimeFormatOptions["hourCycle"] {
+  if (context.timeFormat === "12") return "h12";
+  if (context.timeFormat === "24") return "h23";
+  try {
+    const locale = context.timeFormat === "system" ? undefined : context.locale;
+    const cycle = new Intl.DateTimeFormat(locale, { hour: "numeric" })
+      .resolvedOptions().hourCycle;
+    return cycle === "h11" || cycle === "h12" ? "h12" : "h23";
+  } catch {
+    return undefined;
+  }
+}
+
+function dateTime(
+  time: number,
+  context: FormatContext,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  if (!Number.isFinite(time)) return "—";
+  const resolved = {
+    ...options,
+    timeZone: context.timeZone,
+    ...(options.hour ? { hourCycle: hourCycle(context) } : {}),
+  };
+  try {
+    return new Intl.DateTimeFormat(context.locale || undefined, resolved)
+      .format(new Date(time));
+  } catch {
+    // A malformed custom locale must not discard an otherwise valid timezone.
+    try {
+      return new Intl.DateTimeFormat(undefined, resolved).format(new Date(time));
+    } catch {
+      return new Intl.DateTimeFormat(undefined, options).format(new Date(time));
+    }
+  }
+}
+
 export function formatTime(
   time: number | null | undefined,
   context: FormatContext = {},
 ): string {
-  if (time === null || time === undefined || !Number.isFinite(time)) return "—";
-  try {
-    return new Intl.DateTimeFormat(context.locale || undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: context.timeZone,
-    }).format(new Date(time));
-  } catch {
-    return new Date(time).toLocaleTimeString();
-  }
+  if (time === null || time === undefined) return "—";
+  return dateTime(time, context, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatDateTime(
   time: number | null | undefined,
   context: FormatContext = {},
 ): string {
-  if (time === null || time === undefined || !Number.isFinite(time)) return "—";
-  try {
-    return new Intl.DateTimeFormat(context.locale || undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: context.timeZone,
-    }).format(new Date(time));
-  } catch {
-    return new Date(time).toLocaleString();
-  }
+  if (time === null || time === undefined) return "—";
+  return dateTime(time, context, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 }
 
-export function formatDay(
-  time: number,
-  context: FormatContext = {},
-): string {
-  try {
-    return new Intl.DateTimeFormat(context.locale || undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      timeZone: context.timeZone,
-    }).format(new Date(time));
-  } catch {
-    return new Date(time).toDateString();
-  }
+export function formatDay(time: number, context: FormatContext = {}): string {
+  return dateTime(time, context, { weekday: "short", month: "short", day: "numeric" });
 }
 
-export function formatClock(
-  time: number,
-  context: FormatContext = {},
-): string {
-  try {
-    return new Intl.DateTimeFormat(context.locale || undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: context.timeZone,
-    }).format(new Date(time));
-  } catch {
-    return new Date(time).toLocaleTimeString();
-  }
+export function formatClock(time: number, context: FormatContext = {}): string {
+  return formatTime(time, context);
 }
 
 export function secondsToDuration(value: number | null): number | null {
@@ -1309,13 +1271,18 @@ export function localeContext(
   config: CardConfig | undefined,
   currency: string | undefined,
 ): FormatContext {
+  const zone = hass?.locale?.time_zone;
   return {
     locale: hass?.locale?.language || hass?.language,
-    timeZone:
-      hass?.locale?.time_zone ||
-      (typeof hass?.config?.time_zone === "string"
-        ? hass.config.time_zone
-        : undefined),
+    numberFormat: hass?.locale?.number_format,
+    timeFormat: hass?.locale?.time_format,
+    timeZone: zone === "local"
+      ? undefined
+      : zone && zone !== "server"
+        ? zone
+        : typeof hass?.config?.time_zone === "string"
+          ? hass.config.time_zone
+          : undefined,
     currency: config?.currency || currency,
   };
 }

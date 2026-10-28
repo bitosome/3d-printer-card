@@ -16,8 +16,11 @@ export interface HassEntity {
 
 export interface HassLocale {
   language?: string;
+  /** HA sends "local" or "server"; an explicit IANA zone is also tolerated. */
   time_zone?: string;
+  /** language, system, comma_decimal, decimal_comma, space_comma, quote_decimal, none. */
   number_format?: string;
+  /** language, system, 12 or 24. */
   time_format?: string;
   date_format?: string;
 }
