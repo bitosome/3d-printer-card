@@ -24,6 +24,7 @@ import "./chart";
 import { cardStyles } from "./styles";
 import {
   MAX_HISTORY_DAYS,
+  MAX_POWER_GAP_MS,
   addLiveSample,
   asNumber,
   available,
@@ -92,12 +93,14 @@ import type {
   PrinterEntities,
   PrinterStatus,
   Quote,
+  SeriesPoint,
 } from "./types";
 
 const CARD_TAG = "bambu-printer-card";
 const OVERVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHART_BUCKET_MS = 5 * 60 * 1000;
 const LIVE_SAMPLE_MIN_MS = 5_000;
+const LIVE_MAX_GAP_MS = 120_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 type MainPage = "overview" | "ams";
@@ -410,9 +413,10 @@ export class BambuPrinterCard extends LitElement {
       } else if (
         this.live &&
         this.live.lastAt > 0 &&
-        now - this.live.lastAt >= LIVE_SAMPLE_MIN_MS
+        (now - this.live.lastAt >= LIVE_SAMPLE_MIN_MS ||
+          power !== this.live.lastPower || price !== this.live.lastPrice)
       ) {
-        this.live = addLiveSample(this.live, now, power, price);
+        this.advanceLive(now, printer);
       }
       return;
     }
@@ -460,6 +464,88 @@ export class BambuPrinterCard extends LitElement {
     void this.seedLive(start);
   }
 
+  /** Apply changed inputs at their HA state timestamps, not the next UI tick. */
+  private advanceLive(now: number, printer: PrinterEntities): void {
+    if (!this.live || now < this.live.lastAt) return;
+    const reportedPower = powerWatts(printer.power);
+    const observedPowerAt = parseTime(printer.power?.last_updated) ?? parseTime(printer.power?.last_changed);
+    const power = reportedPower !== null && reportedPower > 2 &&
+      observedPowerAt !== null && now - observedPowerAt > MAX_POWER_GAP_MS
+      ? null : reportedPower;
+    const price = pricePerKwh(printer.price);
+    const from = this.live.lastAt;
+    // Splitting a long unattended interval at a recent tariff timestamp must
+    // not turn an unobserved gap into apparently measured consumption.
+    if (now - from > LIVE_MAX_GAP_MS) {
+      this.live = addLiveSample(this.live, now, power, price, LIVE_MAX_GAP_MS);
+      return;
+    }
+    const events: { t: number; kind: "power" | "price"; value: number | null }[] = [];
+    const changedAt = (entity: PrinterEntities["power"]) => {
+      const stamp = parseTime(entity?.last_changed) ?? parseTime(entity?.last_updated);
+      const observed = parseTime(entity?.last_updated);
+      const recoveredPower = entity === printer.power && this.live?.lastPower === null &&
+        (stamp === null || stamp < from) && observed !== null && observed > from;
+      return recoveredPower ? Math.min(now, observed) :
+        stamp === null ? now : Math.max(from, Math.min(now, stamp));
+    };
+    if (power !== this.live.lastPower) {
+      events.push({ t: changedAt(printer.power), kind: "power", value: power });
+    }
+    if (price !== this.live.lastPrice) {
+      events.push({ t: changedAt(printer.price), kind: "price", value: price });
+    }
+    for (const event of events.sort((a, b) => a.t - b.t)) {
+      this.live = addLiveSample(
+        this.live, event.t,
+        event.kind === "power" ? event.value : this.live.lastPower,
+        event.kind === "price" ? event.value : this.live.lastPrice,
+        LIVE_MAX_GAP_MS,
+      );
+    }
+    this.live = addLiveSample(this.live, now, power, price, LIVE_MAX_GAP_MS);
+  }
+
+  private installLiveSeed(
+    quote: Quote,
+    cutoff: number,
+    power: SeriesPoint[],
+    price: SeriesPoint[],
+  ): void {
+    const held = (series: SeriesPoint[], isPower = false) => {
+      let sample: SeriesPoint | undefined;
+      for (const point of series) {
+        if (point.t > cutoff) break;
+        sample = point;
+      }
+      if (isPower && sample?.v !== null && sample?.v !== undefined && sample.v > 2 &&
+        cutoff - sample.t > MAX_POWER_GAP_MS) return null;
+      return sample?.v ?? null;
+    };
+    this.live = {
+      energy: quote.energy,
+      cost: quote.cost,
+      unpricedEnergy: quote.unpricedEnergy,
+      lastAt: cutoff,
+      lastPower: held(power, true),
+      lastPrice: held(price),
+      gaps: quote.gaps,
+    };
+    if (this.printer) {
+      // Recorder stops at the request cutoff. A later current state gives its
+      // latest transition, but cannot prove there were no intervening changes.
+      // Keep that provisional tail marked partial until Recorder reconciles it.
+      const inputsDiffer = powerWatts(this.printer.power) !== this.live.lastPower ||
+        pricePerKwh(this.printer.price) !== this.live.lastPrice;
+      const changedAfterCutoff = [this.printer.power, this.printer.price].some(
+        (entity) => (parseTime(entity?.last_changed) ?? parseTime(entity?.last_updated) ?? cutoff) > cutoff,
+      );
+      this.advanceLive(Date.now(), this.printer);
+      if ((inputsDiffer || changedAfterCutoff) && this.live) this.live = { ...this.live, gaps: true };
+    }
+    this.liveReady = true;
+  }
+
   private seedFromHistory(
     session: PrintSession,
     data: OverviewData | HistoryData,
@@ -470,16 +556,7 @@ export class BambuPrinterCard extends LitElement {
       data.energySeries,
       data.priceSeries,
     );
-    this.live = {
-      energy: quote.energy,
-      cost: quote.cost,
-      unpricedEnergy: quote.unpricedEnergy,
-      lastAt: data.chartEnd,
-      lastPower: powerWatts(this.printer?.power),
-      lastPrice: pricePerKwh(this.printer?.price),
-      gaps: quote.gaps,
-    };
-    this.liveReady = true;
+    this.installLiveSeed(quote, data.chartEnd, data.powerSeries, data.priceSeries);
   }
 
   private async seedLive(start: number): Promise<void> {
@@ -535,16 +612,7 @@ export class BambuPrinterCard extends LitElement {
         energySeries,
         priceSeries,
       );
-      this.live = {
-        energy: quote.energy,
-        cost: quote.cost,
-        unpricedEnergy: quote.unpricedEnergy,
-        lastAt: end,
-        lastPower: powerWatts(this.printer?.power),
-        lastPrice: pricePerKwh(this.printer?.price),
-        gaps: quote.gaps,
-      };
-      this.liveReady = true;
+      this.installLiveSeed(quote, end, powerSeries, priceSeries);
     } catch {
       if (generation !== this.liveGeneration) return;
       this.liveReady = true;
@@ -554,9 +622,18 @@ export class BambuPrinterCard extends LitElement {
 
   private scheduleOverviewRefresh(delay: number): void {
     this.clearFinishTimer();
+    // Requests started before the status transition must not restore an
+    // unfinished quote after completion. Keep displayed data while refreshing.
+    this.overviewGeneration++;
+    this.historyGeneration++;
+    this.overviewLoading = false;
+    this.historyLoading = false;
+    this.lastHistoryLoad = 0;
     this.finishTimer = setTimeout(() => {
       this.finishTimer = undefined;
-      if (this.isConnected) void this.loadOverview(true);
+      if (!this.isConnected) return;
+      void this.loadOverview(true);
+      if (this.flow.current === "history") void this.loadHistory(true);
     }, delay);
   }
 
@@ -957,8 +1034,15 @@ export class BambuPrinterCard extends LitElement {
     ) {
       return liveQuote(this.live);
     }
-    const data = this.history ?? this.overview;
-    return data?.quotes.get(session.start) ?? null;
+    // Opening History must not pin the hero to an old in-progress quote.
+    // Compare observation cutoffs (not response arrival time), and fall back
+    // when a newer dataset does not contain this session.
+    const candidates = [this.overview, this.history]
+      .filter((data): data is OverviewData | HistoryData =>
+        !!data && data.quotes.has(session.start),
+      )
+      .sort((a, b) => b.chartEnd - a.chartEnd || b.loadedAt - a.loadedAt);
+    return candidates[0]?.quotes.get(session.start) ?? null;
   }
 
   private currentQuote(): Quote | null {

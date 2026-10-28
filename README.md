@@ -69,7 +69,7 @@ This is a **Dashboard** repository, not an entry in the default HACS catalog.
 1. Download `bambu-printer-card.js` from a release, or use
    `dist/bambu-printer-card.js` from the repository.
 2. Put it in `/config/www/community/3d-printer-card/bambu-printer-card.js`.
-3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.2` as a dashboard
+3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.3` as a dashboard
    resource of type **JavaScript module**.
 4. Reload the frontend and add the card.
 
@@ -90,8 +90,9 @@ This is a **Dashboard** repository, not an entry in the default HACS catalog.
 
 History is read from **Home Assistant Recorder**. The default Recorder
 retention is 10 days; the card can request up to 30 days, but it can only show
-what Recorder still has. Cost tracking starts when the card first has both
-power and price history; older prints are not reconstructed.
+what Recorder still has. Past prints are reconstructed when their status,
+power (or energy), and price history are available. The card does not create
+a separate permanent ledger.
 
 ## Configuration
 
@@ -179,7 +180,10 @@ Print cost is an **estimate**, not a billing-meter guarantee.
 5. The live estimate is seeded from Recorder when the card loads, then updated
    from Home Assistant state changes. It re-seeds after five minutes, when the
    tab becomes visible, and whenever the card has to recover from a background
-   gap. When a print ends, the completed record is recomputed from Recorder.
+   gap. When a print ends, the completed record is recomputed from Recorder
+   and an open History dialog refreshes automatically. Older snapshots cannot
+   override a newer completed estimate. If sensors change while Recorder is
+   loading, the unrecorded tail remains provisional until the next reconciliation.
 6. Cumulative plug energy is the fallback when power history is absent. Each
    observed meter delta is allocated uniformly between its two readings to
    estimate the part inside the print and split tariff changes. It never

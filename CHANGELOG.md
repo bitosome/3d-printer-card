@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 — 2026-10-28
+
+- Keep completed electricity estimates current when History was opened during the print; choose the newest matching recorded estimate and refresh visible History after completion.
+- Ignore pending pre-completion responses so they cannot restore an unfinished history snapshot.
+- Correct live tariff-transition and history-seeding timing without repricing earlier consumption.
+- Add regression checks for cache freshness, completion refreshes and live accounting; clarify Recorder reconstruction and retention.
+
 ## 0.2.2 — 2026-10-28
 
 - Align headers, state chips, metric labels and telemetry with the pinned shared UI library; retain temperature targets and keep previews accessible on narrow cards.
