@@ -159,10 +159,13 @@ check(
     !root?.querySelector(".ams-card") &&
     text(root?.querySelector(".ams-summary-tile")).includes("Bambu PLA Basic"),
 );
-root?.querySelector(".ams-summary-tile")?.click();
+const amsOpener = root.querySelector(".ams-summary-tile");
+const overviewBeforeAms = root.querySelector("main.panel");
+const cameraBeforeAms = root.querySelector("ha-camera-stream");
+amsOpener.click();
 await tick(100);
 check(
-  "the AMS page shows both units and all eight trays",
+  "the AMS modal shows both units and all eight trays",
   root?.querySelectorAll(".ams-card").length === 2 &&
     root?.querySelectorAll(".tray").length === 8,
 );
@@ -172,6 +175,13 @@ check(
     text(root?.querySelector(".tray.active")).includes("Active") &&
     text(root?.querySelector(".tray.active")).includes("97%"),
 );
+check("AMS keeps the main card and live camera in place", root.querySelector("main.panel") === overviewBeforeAms && root.querySelector("ha-camera-stream") === cameraBeforeAms && !overviewBeforeAms.querySelector(".ams-card") && root.querySelector("dialog")?.getAttribute("aria-label") === "AMS");
+root.querySelector('dialog [title="Close"]').click(); await tick(80);
+check("AMS close restores its summary opener", root.activeElement === amsOpener);
+root.querySelector('[data-nav="ams"]').click(); await tick(80);
+check("AMS bottom menu opens the same modal", root.querySelector("dialog")?.getAttribute("aria-label") === "AMS" && root.querySelector('[data-nav="ams"]').getAttribute("aria-haspopup") === "dialog");
+root.querySelector("dialog").dispatchEvent(new Event("cancel", {cancelable:true})); await tick(80);
+check("AMS Escape restores its menu opener", root.activeElement === root.querySelector('[data-nav="ams"]'));
 root?.querySelector('[data-nav="overview"]')?.click();
 await tick(80);
 check(

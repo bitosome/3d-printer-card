@@ -1,6 +1,6 @@
 {
   "name": "bambu-printer-card",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Bambu Lab 3D printer card for Home Assistant with live stream, AMS state and electricity cost per print",
   "keywords": [
     "home-assistant",

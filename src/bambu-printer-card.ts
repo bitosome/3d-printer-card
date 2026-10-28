@@ -110,8 +110,8 @@ const LIVE_SAMPLE_MIN_MS = 5_000;
 const LIVE_MAX_GAP_MS = 120_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-type MainPage = "overview" | "ams";
-type DialogPage = "history" | "details" | "preview";
+type MainPage = "overview";
+type DialogPage = "history" | "details" | "preview" | "ams";
 
 function parseTime(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -1209,6 +1209,7 @@ export class BambuPrinterCard extends LitElement {
     const page = this.flow.current;
     if (!page) return nothing;
     const titles: Record<DialogPage, string> = {
+      ams: "AMS",
       history: "Print history",
       details: "Printer details",
       preview: "Print preview",
@@ -1219,6 +1220,8 @@ export class BambuPrinterCard extends LitElement {
       content:
         !this.printer
           ? notice({ message: "Printer data is unavailable. It will return when the entity reconnects.", tone: "warning" })
+          : page === "ams"
+          ? this.renderAmsPage()
           : page === "history"
           ? this.renderHistory()
           : page === "details"
@@ -1272,26 +1275,18 @@ export class BambuPrinterCard extends LitElement {
     this.closeCamera();
     this.page = page;
     this.requestUpdate();
-    void this.updateComplete.then(() => {
-      if (!this.isConnected || typeof this.scrollIntoView !== "function") return;
-      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      this.scrollIntoView({
-        behavior: reduced ? "auto" : "smooth",
-        block: "start",
-      });
-    });
   }
 
   private renderNav(): TemplateResult | typeof nothing {
     if (!this.printer) return nothing;
     const items: {
-      page: MainPage | "history" | "details";
+      page: MainPage | "ams" | "history" | "details";
       label: string;
       icon: string;
       dialog?: boolean;
     }[] = [
       { page: "overview", label: "Overview", icon: "mdi:home-outline" },
-      { page: "ams", label: "AMS", icon: "mdi:palette-swatch-outline" },
+      { page: "ams", label: "AMS", icon: "mdi:palette-swatch-outline", dialog: true },
       { page: "history", label: "History", icon: UI_ICONS.history, dialog: true },
       { page: "details", label: "Details", icon: UI_ICONS.details, dialog: true },
     ];
@@ -1458,7 +1453,7 @@ export class BambuPrinterCard extends LitElement {
           )}`;
     }
     return html`<main class="panel" aria-label=${`${this.page} panel`}>
-        ${this.page === "ams" ? this.renderAmsPage() : this.renderOverviewPage()}
+        ${this.renderOverviewPage()}
       </main>
       ${this.renderNav()}`;
   }
@@ -2218,7 +2213,8 @@ export class BambuPrinterCard extends LitElement {
       class="ams-summary-tile family-surface"
       type="button"
       aria-label=${`Open ${unit.label} details`}
-      @click=${() => this.showPage("ams")}
+      aria-haspopup="dialog"
+      @click=${(event: MouseEvent) => this.openDialog("ams", event.currentTarget as HTMLElement)}
     >
       <span class="ams-summary-head">
         <span class="ams-name">${unit.label}</span>
@@ -2267,7 +2263,8 @@ export class BambuPrinterCard extends LitElement {
       class="ams-summary-tile family-surface"
       type="button"
       aria-label="Open external spool details"
-      @click=${() => this.showPage("ams")}
+      aria-haspopup="dialog"
+      @click=${(event: MouseEvent) => this.openDialog("ams", event.currentTarget as HTMLElement)}
     >
       <span class="ams-summary-head">
         <span class="ams-name">External</span>
@@ -2305,7 +2302,8 @@ export class BambuPrinterCard extends LitElement {
         <button
           class="ams-all"
           type="button"
-          @click=${() => this.showPage("ams")}
+          aria-haspopup="dialog"
+      @click=${(event: MouseEvent) => this.openDialog("ams", event.currentTarget as HTMLElement)}
         >
           All trays<ha-icon .icon=${UI_ICONS.next} aria-hidden="true"></ha-icon>
         </button>

@@ -27,7 +27,7 @@ printer was contacted.</sub>
   data the old ApexCharts card showed. Each record expands to show its start,
   end, average tariff, unpriced energy and partial-estimate reasons.
 - **AMS** — a compact AMS summary on the overview (active tray, remaining
-  filament, colours, loaded count) and a dedicated AMS page with every unit and
+  filament, colours, loaded count) and a dedicated AMS modal with every unit and
   tray: colour, material, remaining percentage, active tray, unit
   temperature/humidity and drying state. Loaded external spools appear
   automatically.
@@ -37,7 +37,7 @@ printer was contacted.</sub>
 - **Notices** — HMS messages, print errors, offline/unavailable telemetry and an
   open enclosure door while printing.
 - **Bottom navigation** — Overview, AMS, History and Details, matching the heat
-  pump card's navigation pattern. History and Details open the shared modal
+  pump card's navigation pattern. AMS, History and Details open the shared modal
   flow; the print history has per-print records and the 24-hour chart.
 - **Details** — a read-only dialog with print job, temperatures, fans, power and
   cost, machine, AMS and HMS data. Rows open Home Assistant's native more-info.
@@ -242,8 +242,9 @@ rules as the other bitosome cards:
 
 ![AMS page and bottom navigation](docs/preview-ams.jpg)
 
-The bottom navigation mirrors the heat pump card: **Overview** and **AMS** are
-inline pages, while **History** and **Details** open the shared modal flow.
+The bottom navigation mirrors the heat pump card: **Overview** stays on the main card. **AMS**, **History** and **Details** open
+the shared modal flow with X/Escape dismissal and focus returned to their opener.
+Opening these sections never replaces the overview or remounts its live camera.
 
 ![Print history dialog](docs/preview-history.jpg)
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 — 2026-10-28
+
+- Open AMS from the bottom menu and summary tiles in the shared modal; retain the overview, camera player and dashboard height.
+- Restore focus to the actual launcher on X/Escape; remove page-switch scrolling.
+
 ## 0.4.0 — 2026-10-28
 
 - Expand the existing camera feed in place using the same shared immersive fullscreen controller as Camera Card; remove the media modal and preserve one player, pinch/pan and safe-area controls.
