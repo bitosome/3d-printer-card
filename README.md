@@ -69,7 +69,7 @@ This is a **Dashboard** repository, not an entry in the default HACS catalog.
 1. Download `bambu-printer-card.js` from a release, or use
    `dist/bambu-printer-card.js` from the repository.
 2. Put it in `/config/www/community/3d-printer-card/bambu-printer-card.js`.
-3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.0` as a dashboard
+3. Add `/hacsfiles/3d-printer-card/bambu-printer-card.js?v=0.2.2` as a dashboard
    resource of type **JavaScript module**.
 4. Reload the frontend and add the card.
 
