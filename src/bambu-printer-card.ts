@@ -1270,25 +1270,16 @@ export class BambuPrinterCard extends LitElement {
     `;
   }
 
-  private showPage(page: MainPage): void {
-    if (this.flow.active) this.flow.close();
-    this.closeCamera();
-    this.page = page;
-    this.requestUpdate();
-  }
-
   private renderNav(): TemplateResult | typeof nothing {
     if (!this.printer) return nothing;
     const items: {
-      page: MainPage | "ams" | "history" | "details";
+      page: "ams" | "history" | "details";
       label: string;
       icon: string;
-      dialog?: boolean;
     }[] = [
-      { page: "overview", label: "Overview", icon: "mdi:home-outline" },
-      { page: "ams", label: "AMS", icon: "mdi:palette-swatch-outline", dialog: true },
-      { page: "history", label: "History", icon: UI_ICONS.history, dialog: true },
-      { page: "details", label: "Details", icon: UI_ICONS.details, dialog: true },
+      { page: "ams", label: "AMS", icon: "mdi:palette-swatch-outline" },
+      { page: "history", label: "History", icon: UI_ICONS.history },
+      { page: "details", label: "Details", icon: UI_ICONS.details },
     ];
     const visible = this.config?.show_ams === false
       ? items.filter((item) => item.page !== "ams")
@@ -1302,20 +1293,9 @@ export class BambuPrinterCard extends LitElement {
         (item) => html`<button
           type="button"
           data-nav=${item.page}
-          aria-current=${!item.dialog && this.page === item.page
-            ? "page"
-            : "false"}
-          aria-haspopup=${item.dialog ? "dialog" : nothing}
-          @click=${(event: MouseEvent) => {
-            if (item.dialog) {
-              this.openDialog(
-                item.page as DialogPage,
-                event.currentTarget as HTMLElement,
-              );
-            } else {
-              this.showPage(item.page as MainPage);
-            }
-          }}
+          aria-haspopup="dialog"
+          @click=${(event: MouseEvent) =>
+            this.openDialog(item.page, event.currentTarget as HTMLElement)}
         >
           <ha-icon .icon=${item.icon} aria-hidden="true"></ha-icon>${item.label}
         </button>`,

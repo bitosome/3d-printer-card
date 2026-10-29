@@ -182,23 +182,8 @@ root.querySelector('[data-nav="ams"]').click(); await tick(80);
 check("AMS bottom menu opens the same modal", root.querySelector("dialog")?.getAttribute("aria-label") === "AMS" && root.querySelector('[data-nav="ams"]').getAttribute("aria-haspopup") === "dialog");
 root.querySelector("dialog").dispatchEvent(new Event("cancel", {cancelable:true})); await tick(80);
 check("AMS Escape restores its menu opener", root.activeElement === root.querySelector('[data-nav="ams"]'));
-root?.querySelector('[data-nav="overview"]')?.click();
-await tick(80);
-check(
-  "the bottom navigation returns to the overview",
-  !!root?.querySelector(".metrics") &&
-    !root?.querySelector(".ams-card") &&
-    root?.querySelector('[data-nav="overview"]')?.getAttribute("aria-current") ===
-      "page",
-);
-
-check(
-  "bottom navigation exposes overview, AMS, history and details",
-  root?.querySelectorAll("[data-nav]").length === 4 &&
-    text(root?.querySelector('[data-nav="ams"]')).includes("AMS") &&
-    text(root?.querySelector('[data-nav="history"]')).includes("History") &&
-    text(root?.querySelector('[data-nav="details"]')).includes("Details"),
-);
+check("main overview stays visible without a redundant launcher", !!root.querySelector(".metrics") && !root.querySelector('[data-nav="overview"]'));
+check("bottom menu exposes only AMS, History and Details dialogs", root.querySelectorAll("[data-nav]").length === 3 && [...root.querySelectorAll("[data-nav]")].every(button => button.getAttribute("aria-haspopup") === "dialog"));
 
 // Clickable model preview ------------------------------------------------
 root?.querySelector("button.hero-art")?.click();
