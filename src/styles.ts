@@ -205,11 +205,22 @@ export const cardStyles = [
       opacity: 0.7;
     }
     .hero-eta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      min-width: 0;
       color: var(--secondary-text-color);
       font-size: 11.5px;
       line-height: 1.35;
       text-align: right;
+      font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
+    }
+    .hero-ready {
+      color: var(--primary-text-color);
+      font-size: 12px;
+      font-weight: 600;
     }
     .progress-track {
       height: 7px;

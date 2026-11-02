@@ -14,7 +14,7 @@ printer was contacted.</sub>
 
 ## What you get
 
-- **Printing now / last print** — task name, progress, ETA, layers, filament
+- **Printing now / last print** — task name, progress, time left and ready time, layers, filament
   weight and length, speed profile and the current print's cover image. Tap the
   cover image for a full print preview.
 - **Live camera** — the same Home Assistant camera/WebRTC elements used by the

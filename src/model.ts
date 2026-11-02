@@ -1216,6 +1216,70 @@ export function remainingMs(entity: HassEntity | null): number | null {
   return value * 3_600_000;
 }
 
+/** A native end time this far in the past is stale, not an imminent finish. */
+const END_TIME_STALE_MS = 60_000;
+
+/**
+ * Wall-clock instant a running print should be ready. Prefers the Bambu Lab
+ * integration's own end_time timestamp, then HA's remaining_time measured
+ * from that sensor's last update. Null whenever the printer is not actively
+ * printing or the estimate is unknown, so the caller hides the ETA.
+ */
+export function printEndTime(
+  status: PrinterStatus,
+  end: HassEntity | null,
+  remaining: HassEntity | null,
+  now = Date.now(),
+): number | null {
+  if (status !== "printing") return null;
+  if (end && !isUnavailable(end.state)) {
+    const native = Date.parse(end.state);
+    if (Number.isFinite(native) && native >= now - END_TIME_STALE_MS) return native;
+  }
+  if (!remaining || isUnavailable(remaining.state)) return null;
+  const left = remainingMs(remaining);
+  if (left === null || left <= 0) return null;
+  const reported = Date.parse(remaining.last_updated ?? "");
+  const base = Number.isFinite(reported) && reported <= now ? reported : now;
+  const computed = base + left;
+  return computed >= now - END_TIME_STALE_MS ? computed : null;
+}
+
+/** Calendar date in the formatting time zone, as a UTC-midnight day number. */
+function calendarDay(time: number, context: FormatContext): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: context.timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    }).formatToParts(new Date(time));
+    const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+    const day = Date.UTC(part("year"), part("month") - 1, part("day"));
+    return Number.isFinite(day) ? Math.round(day / 86_400_000) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Ready 14:35", "Ready tomorrow 02:10", "Ready Wed 02:10" or with a date. */
+export function formatReadyAt(
+  end: number | null | undefined,
+  now = Date.now(),
+  context: FormatContext = {},
+): string {
+  if (end === null || end === undefined || !Number.isFinite(end)) return "";
+  const clock = formatTime(end, context);
+  const endDay = calendarDay(end, context);
+  const today = calendarDay(now, context);
+  const days = endDay === null || today === null ? null : endDay - today;
+  if (days === null) return `Ready ${formatDateTime(end, context)}`;
+  if (days <= 0) return `Ready ${clock}`;
+  if (days === 1) return `Ready tomorrow ${clock}`;
+  if (days < 7) return `Ready ${dateTime(end, context, { weekday: "short" })} ${clock}`;
+  return `Ready ${formatDateTime(end, context)}`;
+}
+
 export function percent(value: number | null): number {
   if (value === null || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));

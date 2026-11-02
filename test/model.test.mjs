@@ -14,10 +14,12 @@ import {
   formatDateTime,
   localeContext,
   formatDuration,
+  formatReadyAt,
   historyPath,
   liveQuote,
   normalizeStatus,
   parseHistory,
+  printEndTime,
   quoteEnergy,
   quotePower,
   resolvePrinter,
@@ -454,6 +456,78 @@ check("system clock preference selects browser hour cycle, keeps display languag
   const cycle = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hourCycle;
   const context = { locale: "en-US", timeZone: "UTC", timeFormat: "system" };
   assert.equal(formatClock(afternoon, context), formatClock(afternoon, { ...context, timeFormat: cycle === "h11" || cycle === "h12" ? "12" : "24" }));
+});
+
+check("print end time prefers the native end_time sensor while printing", () => {
+  const now = t("2026-11-02T18:46:30Z");
+  const end = { entity_id: "sensor.p_end_time", state: "2026-11-03T04:05:00+00:00", attributes: { device_class: "timestamp" } };
+  const remaining = {
+    entity_id: "sensor.p_remaining_time",
+    state: "9.31666666666667",
+    attributes: { unit_of_measurement: "h" },
+    last_updated: "2026-11-02T18:46:18Z",
+  };
+  assert.equal(printEndTime("printing", end, remaining, now), t("2026-11-03T04:05:00Z"));
+  // Without a native end time, remaining time counts from HA's sensor update.
+  assert.equal(
+    printEndTime("printing", null, remaining, now),
+    t("2026-11-02T18:46:18Z") + 9.31666666666667 * 3_600_000,
+  );
+  const minutes = { ...remaining, state: "90", attributes: { unit_of_measurement: "min" } };
+  assert.equal(printEndTime("printing", null, minutes, now), t("2026-11-02T20:16:18Z"));
+  // A future sensor timestamp (clock skew) never pushes the ETA back.
+  const skewed = { ...remaining, last_updated: "2026-11-02T19:00:00Z" };
+  assert.equal(printEndTime("printing", null, skewed, now), now + 9.31666666666667 * 3_600_000);
+});
+
+check("print end time follows remaining time when the native timestamp is unusable", () => {
+  const now = t("2026-11-02T18:46:30Z");
+  const remaining = { entity_id: "r", state: "2", attributes: { unit_of_measurement: "h" }, last_updated: "2026-11-02T18:46:00Z" };
+  const expected = t("2026-11-02T20:46:00Z");
+  for (const state of ["unknown", "unavailable", "", "not a time", "2026-11-02T10:00:00+00:00"]) {
+    assert.equal(printEndTime("printing", { entity_id: "e", state, attributes: {} }, remaining, now), expected, state);
+  }
+  // A fresher remaining reading moves the ETA.
+  const later = { ...remaining, state: "1.5", last_updated: "2026-11-02T18:50:00Z" };
+  assert.equal(printEndTime("printing", null, later, now + 4 * 60_000), t("2026-11-02T20:20:00Z"));
+});
+
+check("print end time is hidden unless a print is running with a known estimate", () => {
+  const now = t("2026-11-02T18:46:30Z");
+  const end = { entity_id: "e", state: "2026-11-03T04:05:00+00:00", attributes: {} };
+  const remaining = { entity_id: "r", state: "2", attributes: { unit_of_measurement: "h" }, last_updated: "2026-11-02T18:46:00Z" };
+  for (const status of ["idle", "paused", "preparing", "finished", "failed", "offline", "unavailable", "unknown"]) {
+    assert.equal(printEndTime(status, end, remaining, now), null, status);
+  }
+  for (const state of ["unknown", "unavailable", "0", "-1", "soon"]) {
+    assert.equal(printEndTime("printing", null, { ...remaining, state }, now), null, state);
+  }
+  assert.equal(printEndTime("printing", null, null, now), null);
+  // A remaining reading that has long since run out is unknown, not "ready now".
+  assert.equal(printEndTime("printing", null, { ...remaining, last_updated: "2026-11-02T10:00:00Z" }, now), null);
+});
+
+check("ready time names the day in HA's time zone and clock format", () => {
+  const tallinn = { locale: "en-GB", timeZone: "Europe/Tallinn", timeFormat: "24" };
+  const now = t("2026-11-02T18:46:00Z"); // 20:46 in Tallinn
+  assert.equal(formatReadyAt(t("2026-11-02T20:35:00Z"), now, tallinn), "Ready 22:35");
+  assert.equal(formatReadyAt(t("2026-11-03T00:10:00Z"), now, tallinn), "Ready tomorrow 02:10");
+  // The same instants are still today in UTC, so the label follows the zone.
+  assert.equal(formatReadyAt(t("2026-11-02T23:10:00Z"), now, { ...tallinn, timeZone: "UTC" }), "Ready 23:10");
+  assert.equal(formatReadyAt(t("2026-11-02T23:10:00Z"), now, tallinn), "Ready tomorrow 01:10");
+  assert.equal(formatReadyAt(t("2026-11-04T08:00:00Z"), now, tallinn), "Ready Wed 10:00");
+  assert.match(formatReadyAt(t("2026-11-12T08:00:00Z"), now, tallinn), /^Ready 12 Nov,? 10:00$/);
+  assert.match(formatReadyAt(t("2026-11-03T14:05:00Z"), now, { ...tallinn, locale: "en-US", timeFormat: "12" }), /^Ready tomorrow 04:05\s*PM$/);
+  assert.equal(formatReadyAt(null, now, tallinn), "");
+  assert.equal(formatReadyAt(Number.NaN, now, tallinn), "");
+});
+
+check("ready time crosses DST changes on the local calendar", () => {
+  const tallinn = { locale: "en-GB", timeZone: "Europe/Tallinn", timeFormat: "24" };
+  // Summer time ends 2026-10-25 04:00 EEST; both instants fall on the next local day.
+  const now = t("2026-10-24T20:30:00Z");
+  assert.equal(formatReadyAt(t("2026-10-24T23:30:00Z"), now, tallinn), "Ready tomorrow 02:30");
+  assert.equal(formatReadyAt(t("2026-10-25T02:30:00Z"), now, tallinn), "Ready tomorrow 04:30");
 });
 
 check("state points sort and collapse duplicate timestamps", () => {

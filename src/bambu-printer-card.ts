@@ -55,6 +55,7 @@ import {
   formatPercent,
   formatPower,
   formatPrice,
+  formatReadyAt,
   formatRelative,
   formatTemperature,
   formatTime,
@@ -72,6 +73,7 @@ import {
   powerValue,
   powerWatts,
   pricePerKwh,
+  printEndTime,
   priceValue,
   quoteSession,
   remainingMs,
@@ -1536,8 +1538,11 @@ export class BambuPrinterCard extends LitElement {
           : status === "offline" || status === "unavailable"
             ? "Printer offline"
             : "Ready to print";
+    const now = Date.now();
+    const readyAt = printEndTime(status, printer.end, printer.remaining, now);
+    const ready = formatReadyAt(readyAt, now, this.formatContext);
     const eta = active
-      ? `ETA ${formatEta(remainingMs(printer.remaining))}`
+      ? `${formatEta(remainingMs(printer.remaining))} left`
       : hasLast && last
         ? `Finished ${formatTime(last.end, this.formatContext)}`
         : status === "offline" || status === "unavailable"
@@ -1627,7 +1632,17 @@ export class BambuPrinterCard extends LitElement {
                     <strong class="hero-percent">
                       ${formatNumber(progress, 0, this.formatContext)}<small>%</small>
                     </strong>
-                    <span class="hero-eta">${eta}</span>
+                    <span class="hero-eta">
+                      <span class="hero-remaining">${eta}</span>
+                      ${readyAt !== null && ready
+                        ? html`<time
+                            class="hero-ready"
+                            datetime=${new Date(readyAt).toISOString()}
+                            title=${`Estimated ready ${formatDateTime(readyAt, this.formatContext)}`}
+                            >${ready}</time
+                          >`
+                        : nothing}
+                    </span>
                   </div>
                   <div
                     class="progress-track"

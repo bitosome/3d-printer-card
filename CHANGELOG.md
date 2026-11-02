@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 2026-11-02
+
+- Show when a running print will be ready next to the remaining time, e.g. "Ready 14:35" or "Ready tomorrow 02:10"; later days show the weekday or date.
+- Prefer the Bambu Lab integration's native end-time sensor; otherwise count the remaining time from Home Assistant's last sensor update. The ready time follows new readings.
+- Format the ready time and its day with Home Assistant's time-zone, language and 12/24-hour preferences.
+- Hide the ready time while preparing, paused or idle, and when the estimate is unknown, unavailable or stale. The remaining time now reads "… left" instead of "ETA …".
+
 ## 0.4.1 — 2026-10-28
 
 - Open AMS from the bottom menu and summary tiles in the shared modal; retain the overview, camera player and dashboard height.
