@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import {
   addLiveSample,
-  buildChartBuckets,
   deriveSessions,
   formatCurrency,
   formatNumber,
@@ -313,24 +312,6 @@ check("live samples accumulate and cap stale gaps", () => {
   const stale = addLiveSample(accumulator, t("2026-10-27T11:00:00Z"), 1000, 0.2);
   assert.equal(stale.gaps, true);
   assert.equal(liveQuote(stale).complete, false);
-});
-
-check("chart buckets carry sample-and-hold values", () => {
-  const buckets = buildChartBuckets(
-    series([
-      ["2026-10-27T10:00:00Z", 100],
-      ["2026-10-27T10:10:00Z", 200],
-    ]),
-    series([["2026-10-27T10:00:00Z", 1]]),
-    t("2026-10-27T10:00:00Z"),
-    t("2026-10-27T10:15:00Z"),
-    5 * 60_000,
-  );
-  assert.equal(buckets.length, 3);
-  assert.equal(buckets[0].power, 100);
-  assert.equal(buckets[1].power, 100);
-  assert.equal(buckets[2].power, 200);
-  assert.equal(buckets[2].current, 1);
 });
 
 check("history transport maps minimal responses by entity id", () => {

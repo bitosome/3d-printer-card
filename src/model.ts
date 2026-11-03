@@ -9,7 +9,6 @@ import type {
   AmsTray,
   AmsUnit,
   CardConfig,
-  ChartBucket,
   ExternalSpool,
   HassEntity,
   HistoryState,
@@ -920,64 +919,6 @@ export function liveQuote(accumulator: LiveAccumulator): Quote {
     gaps: accumulator.gaps,
     complete: false,
   });
-}
-
-// ---------------------------------------------------------------------------
-// Chart
-// ---------------------------------------------------------------------------
-
-export function buildChartBuckets(
-  power: SeriesPoint[],
-  current: SeriesPoint[],
-  start: number,
-  end: number,
-  bucketMs: number,
-): ChartBucket[] {
-  const buckets: ChartBucket[] = [];
-  if (!(end > start) || bucketMs <= 0) return buckets;
-  const count = Math.max(1, Math.min(1440, Math.ceil((end - start) / bucketMs)));
-  const width = (end - start) / count;
-
-  const powerSorted = [...power].sort((a, b) => a.t - b.t);
-  const currentSorted = [...current].sort((a, b) => a.t - b.t);
-  let powerIndex = 0;
-  let currentIndex = 0;
-  let powerValue: number | null = null;
-  let currentValue: number | null = null;
-
-  while (powerIndex < powerSorted.length && powerSorted[powerIndex].t <= start) {
-    powerValue = powerSorted[powerIndex].v;
-    powerIndex++;
-  }
-  while (
-    currentIndex < currentSorted.length &&
-    currentSorted[currentIndex].t <= start
-  ) {
-    currentValue = currentSorted[currentIndex].v;
-    currentIndex++;
-  }
-
-  for (let index = 0; index < count; index++) {
-    const bucketStart = start + index * width;
-    const bucketEnd = bucketStart + width;
-    while (powerIndex < powerSorted.length && powerSorted[powerIndex].t < bucketEnd) {
-      powerValue = powerSorted[powerIndex].v;
-      powerIndex++;
-    }
-    while (
-      currentIndex < currentSorted.length &&
-      currentSorted[currentIndex].t < bucketEnd
-    ) {
-      currentValue = currentSorted[currentIndex].v;
-      currentIndex++;
-    }
-    buckets.push({
-      t: bucketStart,
-      power: powerValue,
-      current: currentValue,
-    });
-  }
-  return buckets;
 }
 
 // ---------------------------------------------------------------------------

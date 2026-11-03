@@ -85,12 +85,6 @@ export interface SeriesPoint {
   v: number | null;
 }
 
-export interface ChartBucket {
-  t: number;
-  power: number | null;
-  current: number | null;
-}
-
 export type PrinterStatus =
   | "printing"
   | "preparing"
@@ -234,7 +228,9 @@ export interface OverviewData {
   loadedAt: number;
   chartStart: number;
   chartEnd: number;
-  buckets: ChartBucket[];
+  /** 5-minute sample-and-hold buckets of the chart window; null where nothing was recorded. */
+  chartPower: SeriesPoint[];
+  chartCurrent: SeriesPoint[];
   sessions: PrintSession[];
   quotes: Map<number, Quote>;
   powerSeries: SeriesPoint[];

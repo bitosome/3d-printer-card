@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 — 2026-11-03
+
+- The 24 h power chart on the card and in History is now the shared chart from ha-card-ui 1.7.0, the same one the weather forecast and electricity price cards use. The card's own chart element is gone.
+- Power draws as a 4px stepped line with a shadow and an area that fades downwards; current is a 2px neutral line. Recorder samples are held in 5-minute steps, and missing data stays a gap.
+- The axes have five gridlines with round values. Watts are on the right and amps on the left, with the unit in each label ("300 W", "0.25 A"). Axis labels, readout and time labels use the shared Home Assistant formatters, like the weather and electricity price charts: every axis label has the step's decimals (0.25 A, never 0.3 A), and the time reads as date and time without the year. Time labels show the date and time and fit the card width. Small negative plug readings are drawn at zero, as before, so they cannot stretch the watt axis below zero.
+- Scrub the chart, or focus it and use the arrow keys, Page Up/Down, Home and End: the head shows the selected time with the power and current, and a dot marks each line. Escape returns to the latest reading, and so does each refresh of the chart data. The chart follows the History button in the tab order.
+- The chart panel takes the shared primary-tinted chart background. The head adds the readout next to the "Power · 24 h" button, or below it on narrow cards. Loading, error and empty states keep the chart's height (120 px on the card, 160 px in History), so the panel does not jump. The card has no chart CSS of its own; restyle it with the shared `--family-chart-*` variables.
+- A sensor that never reported in the window gets no legend entry or axis labels. The legend notes "Gaps mean missing data" only when there are gaps. The loading shimmer stops under reduced motion.
+- Needs ha-card-ui 1.7.0.
+
 ## 0.7.0 — 2026-11-03
 
 - Bundle shared UI 1.6.0 for the camera overlay and progress bar. The printer camera now uses Camera Card's viewer 1:1: the same top-right row of 44px rounded buttons, 8px from the edges and 8px apart, in the minimised card and in fullscreen.

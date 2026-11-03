@@ -1,5 +1,6 @@
 import { css } from "lit";
 import {
+  chartStyles,
   componentStyles,
   dialogStyles,
   familyStyles,
@@ -22,6 +23,7 @@ export const cardStyles = [
   mediaFullscreenStyles,
   glowStyles,
   componentStyles,
+  chartStyles,
   mediaControlStyles,
   css`
     :host {
@@ -469,12 +471,15 @@ export const cardStyles = [
     }
 
     /* Chart -------------------------------------------------------------- */
+    /* The shared chart frame draws the panel; it stays above the hero glow. */
     .chart-panel {
-      position: relative;
       z-index: 1;
-      padding: 10px 10px 6px;
-      border-radius: var(--tile-border-radius, 16px);
-      min-width: 0;
+    }
+    /* The history launcher sits in the frame's title slot. The shared head wraps
+       the readout onto its own row on a narrow card and never clips the focus
+       ring; only the launcher's own title stays on one line. */
+    .chart-title {
+      white-space: nowrap;
     }
     .chart-head {
       display: flex;
@@ -484,22 +489,21 @@ export const cardStyles = [
       width: 100%;
       min-height: 44px;
       padding: 2px 4px 4px;
+      border-radius: 8px;
       background: transparent;
       text-align: start;
+    }
+    .chart-head:focus-visible {
+      outline-offset: -3px;
     }
     .chart-head-copy {
       display: grid;
       gap: 2px;
       min-width: 0;
     }
-    .chart-title {
-      font-size: 12.5px;
-      font-weight: 650;
-      line-height: 1.3;
-      letter-spacing: -0.01em;
-    }
     .chart-sub {
       font-size: 11px;
+      font-weight: 400;
       color: var(--secondary-text-color);
       line-height: 1.35;
       font-variant-numeric: tabular-nums;
@@ -511,33 +515,6 @@ export const cardStyles = [
       height: 20px;
       --mdc-icon-size: 20px;
       flex: 0 0 20px;
-    }
-    .chart-skeleton {
-      height: 120px;
-      border-radius: 10px;
-      margin-bottom: 4px;
-      background: linear-gradient(
-        100deg,
-        color-mix(in srgb, var(--primary-text-color) 4%, transparent) 30%,
-        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 50%,
-        color-mix(in srgb, var(--primary-text-color) 4%, transparent) 70%
-      );
-      background-size: 200% 100%;
-      animation: chartShimmer 1.6s ease-in-out infinite;
-    }
-    @keyframes chartShimmer {
-      0% {
-        background-position: 130% 0;
-      }
-      100% {
-        background-position: -30% 0;
-      }
-    }
-    .chart-state {
-      display: grid;
-      align-content: center;
-      min-height: 60px;
-      padding: 8px;
     }
 
     /* AMS ---------------------------------------------------------------- */
@@ -1018,26 +995,6 @@ export const cardStyles = [
       font-size: 11px;
       line-height: 1.3;
       color: var(--secondary-text-color);
-    }
-    .history-chart {
-      padding: 10px;
-      border-radius: var(--tile-border-radius, 16px);
-      min-width: 0;
-    }
-    .history-chart-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 2px 4px 6px;
-    }
-    .history-chart-head strong {
-      font-size: 12.5px;
-      font-weight: 650;
-    }
-    .history-chart-head span {
-      color: var(--secondary-text-color);
-      font-size: 12px;
     }
     .history-list {
       display: grid;

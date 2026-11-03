@@ -9,6 +9,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
 import {
+  FamilyChartController,
   FamilyFlowController,
   MediaZoomController,
   MediaFullscreenFallbackController,
@@ -18,6 +19,10 @@ import {
   actionPill,
   asyncState,
   buildGlow,
+  chartFrame,
+  chartLegend,
+  chartSkeleton,
+  chartState,
   designTokens,
   createMediaFullscreenAPI,
   ensureCameraStreamElements,
@@ -34,8 +39,14 @@ import {
   tileGlow,
   toggleMediaFullscreen,
 } from "@bitosome/ha-card-ui";
-import "./chart";
 import "./accessory-controls";
+import {
+  powerChartBuckets,
+  powerChartHeight,
+  powerChartId,
+  powerChartOptions,
+  type PowerChartVariant,
+} from "./power-chart";
 import { cardStyles } from "./styles";
 import {
   MAX_HISTORY_DAYS,
@@ -43,7 +54,6 @@ import {
   addLiveSample,
   asNumber,
   available,
-  buildChartBuckets,
   clampHistoryDays,
   currencySymbol,
   currentAmps,
@@ -115,7 +125,6 @@ import type {
 
 const CARD_TAG = "bambu-printer-card";
 const OVERVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
-const CHART_BUCKET_MS = 5 * 60 * 1000;
 const LIVE_SAMPLE_MIN_MS = 5_000;
 const LIVE_MAX_GAP_MS = 120_000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -195,6 +204,7 @@ export class BambuPrinterCard extends LitElement {
     },
   });
   private flow = new FamilyFlowController<DialogPage>(this);
+  private charts = new FamilyChartController(this);
   private cameraExpansion = 0;
   /** Native fullscreen this card entered, tracked so exit works inside nested shadow roots. */
   private cameraNativeFullscreen = false;
@@ -890,13 +900,7 @@ export class BambuPrinterCard extends LitElement {
         loadedAt: Date.now(),
         chartStart: start,
         chartEnd: end,
-        buckets: buildChartBuckets(
-          series.powerSeries,
-          series.currentSeries,
-          start,
-          end,
-          CHART_BUCKET_MS,
-        ),
+        ...powerChartBuckets(series.powerSeries, series.currentSeries, start, end),
         sessions,
         quotes: new Map(),
         powerSeries: series.powerSeries,
@@ -915,6 +919,8 @@ export class BambuPrinterCard extends LitElement {
         );
       }
       this.overview = data;
+      // A pointer pass or key press picked a past bucket; fresh data follows now again.
+      this.charts.select(powerChartId("overview"), undefined);
       this.syncLiveFromOverview();
     } catch (error) {
       if (generation !== this.overviewGeneration) return;
@@ -1017,12 +1023,11 @@ export class BambuPrinterCard extends LitElement {
         loadedAt: Date.now(),
         chartStart: Math.max(start, end - OVERVIEW_WINDOW_MS),
         chartEnd: end,
-        buckets: buildChartBuckets(
+        ...powerChartBuckets(
           series.powerSeries,
           series.currentSeries,
           Math.max(start, end - OVERVIEW_WINDOW_MS),
           end,
-          CHART_BUCKET_MS,
         ),
         sessions,
         quotes,
@@ -1035,6 +1040,7 @@ export class BambuPrinterCard extends LitElement {
         pricedSessions,
       };
       this.history = data;
+      this.charts.select(powerChartId("history"), undefined);
       this.lastHistoryLoad = Date.now();
       if (
         isActiveStatus(this.status) &&
@@ -2078,42 +2084,77 @@ export class BambuPrinterCard extends LitElement {
     ]
       .filter((value): value is string => !!value)
       .join(" · ");
-    return html`<section class="chart-panel family-surface">
-      <button
-        class="chart-head"
-        type="button"
-        aria-haspopup="dialog"
-        aria-label="Open power and current history"
-        @click=${(event: MouseEvent) =>
-          this.openDialog("history", event.currentTarget as HTMLElement)}
-      >
-        <span class="chart-head-copy">
-          <span class="chart-title">Power · 24 h</span>
-          <span class="chart-sub">${sub || "Recorded printer load"}</span>
-        </span>
-        <ha-icon .icon=${UI_ICONS.history} aria-hidden="true"></ha-icon>
-      </button>
-      ${this.overview
-        ? html`<bambu-print-chart
-            .buckets=${this.overview.buckets}
-            .start=${this.overview.chartStart}
-            .end=${this.overview.chartEnd}
-            .context=${this.formatContext}
-            .height=${120}
-            .compact=${true}
-          ></bambu-print-chart>`
-        : this.overviewLoading
-          ? html`<div class="chart-skeleton" aria-label="Loading power history"></div>`
-          : html`<div class="chart-state">
-              ${this.overviewError
-                ? asyncState({
-                    state: "error",
-                    message: `Could not load power history. ${this.overviewError}`,
-                    onRetry: () => void this.loadOverview(true),
-                  })
-                : asyncState({ state: "empty", message: "No recorded power history yet." })}
-            </div>`}
-    </section>`;
+    // The launcher is the frame title: it opens the history dialog, while the
+    // chart below it is a slider of its own (scrub, arrows, Home/End).
+    const launcher = html`<button
+      class="chart-head"
+      type="button"
+      aria-haspopup="dialog"
+      aria-label="Open power and current history"
+      @click=${(event: MouseEvent) =>
+        this.openDialog("history", event.currentTarget as HTMLElement)}
+    >
+      <span class="chart-head-copy">
+        <span class="chart-title">Power · 24 h</span>
+        <span class="chart-sub">${sub || "Recorded printer load"}</span>
+      </span>
+      <ha-icon .icon=${UI_ICONS.history} aria-hidden="true"></ha-icon>
+    </button>`;
+    if (!this.overview) {
+      // Loading, error and empty bodies keep the chart's height, so the panel never jumps.
+      const height = powerChartHeight("overview");
+      return chartFrame({
+        className: "chart-panel",
+        title: launcher,
+        body: this.overviewLoading
+          ? chartSkeleton({ height, label: "Loading power history" })
+          : this.overviewError
+            ? chartState({
+                height,
+                state: "error",
+                message: `Could not load power history. ${this.overviewError}`,
+                onRetry: () => void this.loadOverview(true),
+              })
+            : chartState({ height, state: "empty", message: "No recorded power history yet." }),
+      });
+    }
+    return this.renderPowerChart(this.overview, "overview", launcher);
+  }
+
+  /** The history chart before any power history is in: its states at the chart's height. */
+  private renderHistoryChartState(title: string): TemplateResult {
+    const height = powerChartHeight("history");
+    return chartFrame({
+      className: "history-chart",
+      title,
+      body: this.historyLoading || this.overviewLoading
+        ? chartSkeleton({ height, label: "Loading power history" })
+        : this.historyError
+          // The session list below carries the retry for the same request.
+          ? chartState({ height, state: "error", message: "Power history is unavailable." })
+          : chartState({ height, state: "empty", message: "No recorded power history yet." }),
+    });
+  }
+
+  private renderPowerChart(
+    data: OverviewData,
+    variant: PowerChartVariant,
+    title: unknown,
+  ): TemplateResult {
+    const options = powerChartOptions(data, this.hass, variant);
+    const view = this.charts.render(options);
+    return chartFrame({
+      className: variant === "overview" ? "chart-panel" : "history-chart",
+      title,
+      readout: view.readout,
+      legend: view.model.empty
+        ? nothing
+        : chartLegend(options.series, {
+            gapNote: "Gaps mean missing data",
+            show: view.model.hasGaps,
+          }),
+      body: view.svg,
+    });
   }
 
   private spoolButton(options: {
@@ -2775,20 +2816,8 @@ export class BambuPrinterCard extends LitElement {
         )}
       </div>
       ${chart
-        ? html`<section class="history-chart family-surface">
-            <div class="history-chart-head">
-              <strong>Power and current · 24 h</strong>
-              <span>last 24 h</span>
-            </div>
-            <bambu-print-chart
-              .buckets=${chart.buckets}
-              .start=${chart.chartStart}
-              .end=${chart.chartEnd}
-              .context=${this.formatContext}
-              .height=${160}
-            ></bambu-print-chart>
-          </section>`
-        : nothing}
+        ? this.renderPowerChart(chart, "history", "Power and current · 24 h")
+        : this.renderHistoryChartState("Power and current · 24 h")}
       <div class="section-title">
         <h3>Print sessions</h3>
         ${stateChip({

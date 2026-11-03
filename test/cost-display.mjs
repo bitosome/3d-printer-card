@@ -22,7 +22,7 @@ await new Promise((resolve) => setTimeout(resolve, 30));
 const session = { start: Date.now() - 3_600_000, end: Date.now(), status: "finished", open: false, task: "Synthetic completed print", partialStart: false, partialEnd: false };
 const quote = (cost) => ({ cost, energy: 1, pricedEnergy: 1, unpricedEnergy: 0, averagePrice: cost, gaps: false, complete: true });
 const data = (chartEnd, loadedAt, cost, includeSession = true) => ({
-  chartStart: session.start, chartEnd, loadedAt, sessions: [session], buckets: [],
+  chartStart: session.start, chartEnd, loadedAt, sessions: [session], chartPower: [], chartCurrent: [],
   powerSeries: [], energySeries: [], priceSeries: [],
   quotes: new Map(includeSession ? [[session.start, quote(cost)]] : []),
 });

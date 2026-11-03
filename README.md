@@ -222,12 +222,17 @@ cost does not include filament, depreciation or failed-print material.
 The history list is built from the same Recorder data. A session that started
 before the Recorder window is marked partial. The chart always shows the last
 24 hours; the summary and session list use the configured `history_days` window.
+Recorder samples are held in 5-minute steps, and missing data stays a gap. Scrub
+the chart, or focus it and use the arrow keys, Page Up/Down, Home and End, to read
+the power and current at any time in the head; Escape returns to the latest reading.
+To restyle the chart, set the shared `--family-chart-*` variables (`-background`, `-grid`, `-text`, `-now`, `-shadow`, `-series-1`, `-series-2`, `-radius`) on the card, e.g. with card-mod; the card adds no chart CSS of its own.
 
 ## Design and interaction
 
 The card composes the shared `@bitosome/ha-card-ui` tokens, family surfaces,
 metric grid, notices, state chips, loading/empty/error states, pending
-indicators, glow helpers and native dialog flow. It follows the same
+indicators, glow helpers, native dialog flow and the shared time-series chart
+(the same chart as the weather and electricity price cards). It follows the same
 rules as the other bitosome cards:
 
 - main readings stay on the card; metric and telemetry tiles open Home

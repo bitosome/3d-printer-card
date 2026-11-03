@@ -225,7 +225,9 @@ check(
 );
 check(
   "24 h chart renders power and current",
-  !!root?.querySelector("bambu-print-chart")?.shadowRoot?.querySelector("svg"),
+  !!root?.querySelector(".chart-panel svg.family-chart") &&
+    root.querySelectorAll('.chart-panel .family-chart-line[data-series="power"]').length > 0 &&
+    root.querySelectorAll('.chart-panel .family-chart-line[data-series="current"]').length > 0,
 );
 check("no printer or HA service was called", serviceCalls.length === 0);
 
@@ -267,9 +269,37 @@ check(
   /€\s?0\.\d\d/.test(historyText) && historyText.includes("kWh"),
 );
 check(
-  "history chart uses the same 24 h chart element",
-  !!dialog?.querySelector("bambu-print-chart"),
+  "history chart uses the same shared 24 h chart",
+  !!dialog?.querySelector(".history-chart svg.family-chart[role='slider']") &&
+    dialog.querySelector(".history-chart .family-chart-title")?.textContent.trim() === "Power and current · 24 h" &&
+    dialog.querySelector(".history-chart svg.family-chart")?.getAttribute("viewBox")?.split(" ")[3] === "160",
 );
+{
+  // Without any power history the chart frame stays, with its state at the chart's 160 px.
+  const saved = { history: card.history, overview: card.overview };
+  const stateHeight = () =>
+    dialog.querySelector(".history-chart .family-chart-skeleton, .history-chart .family-chart-empty")
+      ?.getAttribute("style")?.match(/(?:min-)?height:\s*(\d+)px/)?.[1];
+  card.history = null;
+  card.overview = null;
+  card.historyLoading = true;
+  await card.updateComplete;
+  dialog = root?.querySelector("dialog.family-dialog");
+  const loadingHeight = stateHeight();
+  card.historyLoading = false;
+  card.historyError = "Recorder offline";
+  await card.updateComplete;
+  const errorHeight = stateHeight();
+  const errorText = text(dialog.querySelector(".history-chart"));
+  card.historyError = "";
+  Object.assign(card, saved);
+  await card.updateComplete;
+  check(
+    "history chart loading and error states keep the chart height",
+    loadingHeight === "160" && errorHeight === "160" && errorText.includes("Power history is unavailable"),
+    `${loadingHeight} ${errorHeight} ${errorText}`,
+  );
+}
 dialog?.querySelector(".family-icon-button[title='Close']")?.click();
 await tick(100);
 check("history dialog closes", !root?.querySelector("dialog.family-dialog"));
