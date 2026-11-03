@@ -65,6 +65,11 @@ const ownCss = customElements.get("bambu-printer-card").elementStyles.at(-1).css
 assert.match(ownCss, /\.hero-percent/);
 assert.doesNotMatch(ownCss, /--status-|--(success|warning|error)-color/);
 assert.doesNotMatch(ownCss, /\.text-button|\.family-brand\s*\{/);
+// Camera overlay and progress come from the shared library, not card-owned copies.
+assert.doesNotMatch(ownCss, /\.(camera-overlay|live-pill|snapshot-pill|camera-actions|camera-fullscreen|camera-zoom-reset|camera-placeholder|camera-caption|progress-track)\b/);
+assert.match(ownCss, /\.progress-meter\s*\{[^}]*--family-level-color:\s*var\(--hero-accent/);
+assert.match(cardCss, /\.family-media-controls\s*\{/);
+assert.match(cardCss, /\.family-level-meter\s*\{/);
 const chartCss = customElements.get("bambu-print-chart").elementStyles.map((sheet) => sheet.cssText).join("\n");
 assert.doesNotMatch(chartCss, /--status-warn-color/, "current is a neutral series, not a warning");
 await win.happyDOM.close();

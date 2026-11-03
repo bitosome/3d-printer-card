@@ -117,22 +117,41 @@ check(
     !!root?.querySelector(".camera-frame") &&
     !!root?.querySelector(".camera-frame ha-camera-stream"),
 );
+const mediaRow = root?.querySelector(".camera-frame > .family-media-controls");
+const mediaLabels = [...(mediaRow?.querySelectorAll(".family-media-button") || [])].map((button) => button.getAttribute("aria-label"));
 check(
-  "camera tile can switch between live and snapshot",
-  root?.querySelectorAll(".camera-actions button").length === 2,
+  "camera overlay is the shared Camera Card control row without a live pill",
+  JSON.stringify(mediaLabels) === JSON.stringify(["Show snapshot", "Enter fullscreen"]) &&
+    !root?.querySelector(".live-pill, .snapshot-pill, .camera-overlay, .camera-actions"),
+  JSON.stringify(mediaLabels),
 );
-root?.querySelector(".camera-actions button:first-child")?.click();
+check(
+  "camera view controls expose no pressed state",
+  [...mediaRow.querySelectorAll(".family-media-button")].every((button) => !button.hasAttribute("aria-pressed")),
+);
+root?.querySelector('.family-media-button[aria-label="Show snapshot"]')?.click();
 await tick(60);
 check(
   "snapshot mode replaces the live element without leaving the card",
   !!root?.querySelector(".camera-frame img.camera-image") &&
-    !root?.querySelector(".camera-frame ha-camera-stream"),
+    !root?.querySelector(".camera-frame ha-camera-stream") &&
+    !!root?.querySelector('.family-media-button[aria-label="Show live stream"]'),
 );
-root?.querySelector(".camera-actions button:first-child")?.click();
+root?.querySelector('.family-media-button[aria-label="Show live stream"]')?.click();
 await tick(60);
 check(
   "live mode restores the camera stream element",
   !!root?.querySelector(".camera-frame ha-camera-stream"),
+);
+const progressMeter = root?.querySelector(".hero .family-level-meter.progress-meter, .family-level-meter.progress-meter");
+check(
+  "print progress uses the shared level meter",
+  progressMeter?.getAttribute("role") === "progressbar" &&
+    progressMeter?.getAttribute("aria-label") === "Print progress" &&
+    progressMeter?.getAttribute("aria-valuenow") === "42" &&
+    !!progressMeter?.querySelector(".family-level-fill") &&
+    !root?.querySelector(".progress-track"),
+  progressMeter?.outerHTML,
 );
 
 const moreInfoEvents = [];
@@ -212,12 +231,13 @@ check("no printer or HA service was called", serviceCalls.length === 0);
 
 // Camera expands in place, including iOS without the Fullscreen API,
 // and never creates a second concurrent live stream.
-const cameraOpener = root.querySelector('[aria-label="Expand camera"]');
+const cameraOpener = root.querySelector('.family-media-button[aria-label="Enter fullscreen"]');
 cameraOpener.click();
 await tick(100);
 check("expanded camera uses shared immersive fullscreen without a dialog", !!root.querySelector('.camera-frame[data-media-fullscreen]') && !root.querySelector("dialog"));
+check("expanded camera marks the frame and activates the fullscreen button", root.querySelector('.camera-frame').classList.contains('family-media-fullscreen') && cameraOpener.classList.contains('active') && cameraOpener.getAttribute('aria-label') === 'Exit fullscreen' && cameraOpener.querySelector('ha-icon')?.icon === 'mdi:fullscreen-exit');
 check("expanded camera keeps only one live player", root.querySelectorAll('ha-camera-stream, ha-web-rtc-player').length === 1);
-root.querySelector('[aria-label="Exit full screen"]').click();
+root.querySelector('[aria-label="Exit fullscreen"]').click();
 await tick(100);
 check("camera fullscreen restores opener focus", root.activeElement === cameraOpener);
 check("camera returns to overview after closing", !!root.querySelector('.overview-grid ha-camera-stream') && !root.querySelector('dialog'));

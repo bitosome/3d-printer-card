@@ -22,6 +22,11 @@ import {
   createMediaFullscreenAPI,
   ensureCameraStreamElements,
   isMediaFullscreen,
+  levelMeter,
+  mediaButton,
+  mediaControls,
+  mediaMessage,
+  mediaZoomReset,
   notice,
   renderFamilyDialog,
   showEntityMoreInfo,
@@ -191,6 +196,8 @@ export class BambuPrinterCard extends LitElement {
   });
   private flow = new FamilyFlowController<DialogPage>(this);
   private cameraExpansion = 0;
+  /** Native fullscreen this card entered, tracked so exit works inside nested shadow roots. */
+  private cameraNativeFullscreen = false;
   private overviewRequested = false;
   private overviewGeneration = 0;
   private liveGeneration = 0;
@@ -1156,12 +1163,20 @@ export class BambuPrinterCard extends LitElement {
     this.cameraZoom.reset();
     const frame = this.shadowRoot?.querySelector(".camera-frame");
     const api = createMediaFullscreenAPI(document);
-    if (frame && isMediaFullscreen(api, frame)) void api.exit().catch(() => undefined);
+    if ((frame && isMediaFullscreen(api, frame)) || (this.cameraNativeFullscreen && api.isFullscreen)) {
+      void api.exit().catch(() => undefined);
+    }
+    this.cameraNativeFullscreen = false;
   }
 
   private onFullscreenChange = (): void => {
     const frame = this.shadowRoot?.querySelector(".camera-frame");
-    const active = this.cameraFallback.active || (!!frame && isMediaFullscreen(createMediaFullscreenAPI(document), frame));
+    const api = createMediaFullscreenAPI(document);
+    if (!api.isFullscreen) this.cameraNativeFullscreen = false;
+    const active =
+      this.cameraFallback.active ||
+      this.cameraNativeFullscreen ||
+      (!!frame && isMediaFullscreen(api, frame));
     if (active !== this.cameraFullscreen) this.cameraZoom.reset();
     this.cameraFullscreen = active;
   };
@@ -1178,12 +1193,22 @@ export class BambuPrinterCard extends LitElement {
     if (!frame) return;
     this.cameraExpanding = true;
     const api = createMediaFullscreenAPI(document);
+    if (this.cameraFullscreen && api.isFullscreen) {
+      // The frame owns native fullscreen; exit directly so the button always
+      // collapses, even where the browser reports only an outer shadow host.
+      await api.exit().catch(() => undefined);
+      if (expansion === this.cameraExpansion) this.cameraExpanding = false;
+      this.onFullscreenChange();
+      return;
+    }
+    const wasFullscreen = api.isFullscreen;
     const handled = await toggleMediaFullscreen(api, frame);
     if (expansion === this.cameraExpansion) this.cameraExpanding = false;
     if (!this.isConnected || expansion !== this.cameraExpansion || generation !== this.flow.generation) {
       if (isMediaFullscreen(api, frame)) await api.exit().catch(() => undefined);
       return;
     }
+    if (!wasFullscreen && api.isFullscreen) this.cameraNativeFullscreen = true;
     this.onFullscreenChange();
     if (!handled && !api.isFullscreen && !this.flow.active) this.cameraFallback.open(frame, opener);
   }
@@ -1647,16 +1672,12 @@ export class BambuPrinterCard extends LitElement {
                         : nothing}
                     </span>
                   </div>
-                  <div
-                    class="progress-track"
-                    role="progressbar"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                    aria-valuenow=${progress}
-                    aria-label="Print progress"
-                  >
-                    <span style=${`width:${progress}%`}></span>
-                  </div>`
+                  ${levelMeter({
+                    value: progress,
+                    label: "Print progress",
+                    role: "progressbar",
+                    className: "progress-meter",
+                  })}`
               : nothing}
             <div class="hero-meta">
               ${meta.length
@@ -1739,11 +1760,44 @@ export class BambuPrinterCard extends LitElement {
       this.cameraLive && this.cameraReady && available(camera);
     const loading =
       this.cameraLive && !this.cameraReady && !this.cameraLoadError && available(camera);
+    const fullscreen = this.cameraFullscreen;
+    const toggleLive = (): void => {
+      this.cameraLive = !this.cameraLive;
+      this.cameraZoom.reset();
+      if (this.cameraLive && this.cameraLoadError) this.retryCamera();
+    };
+    // Same view controls as Camera Card: the label names the next action and
+    // the primary fill marks fullscreen as on.
+    const controls = [
+      this.cameraLoadError && this.cameraLive
+        ? mediaButton({
+            icon: "mdi:reload",
+            label: "Retry live stream",
+            onClick: this.retryCamera,
+          })
+        : nothing,
+      picture || live
+        ? mediaButton({
+            icon: this.cameraLive ? "mdi:image-outline" : "mdi:video-outline",
+            label: this.cameraLive ? "Show snapshot" : "Show live stream",
+            onClick: toggleLive,
+          })
+        : nothing,
+      mediaButton({
+        icon: "mdi:fullscreen",
+        activeIcon: "mdi:fullscreen-exit",
+        active: fullscreen,
+        label: fullscreen ? "Exit fullscreen" : "Enter fullscreen",
+        disabled: this.cameraExpanding,
+        onClick: (event: Event) =>
+          void this.expandCamera(event.currentTarget as HTMLElement),
+      }),
+    ];
     return html`<section
       class="camera-tile family-surface"
       aria-label="Printer camera"
     >
-      <div class="camera-frame ${this.cameraFullscreen ? "camera-expanded" : ""}">
+      <div class="camera-frame ${fullscreen ? "family-media-fullscreen" : ""}">
         <div class="camera-viewport"
           @touchstart=${this.cameraZoom.touchStart}
           @touchmove=${this.cameraZoom.touchMove}
@@ -1751,98 +1805,45 @@ export class BambuPrinterCard extends LitElement {
           @touchcancel=${this.cameraZoom.touchEnd}
           @click=${{ handleEvent: (event: Event) => this.cameraZoom.consumeClick(event), capture: true }}
         >
-        <div class="camera-media" style=${`transform:${this.cameraZoom.transform}`}>
-        ${live
-          ? webRtc
-            ? html`<ha-web-rtc-player
-                .hass=${this.hass}
-                .entityid=${camera.entity_id}
-                .controls=${false}
-                .muted=${true}
-                .fitMode=${this.cameraFullscreen ? "contain" : "cover"}
-                autoplay
-                playsinline
-              ></ha-web-rtc-player>`
-            : html`<ha-camera-stream
-                .hass=${this.hass}
-                .stateObj=${camera}
-                .controls=${false}
-                .muted=${true}
-                .fitMode=${this.cameraFullscreen ? "contain" : "cover"}
-              ></ha-camera-stream>`
-          : picture
-            ? html`<img
-                class="camera-image"
-                src=${picture}
-                alt="Printer camera snapshot"
-              />`
-            : nothing}
-        ${!live && !picture
-          ? html`<div class="camera-placeholder">
-              <ha-icon
-                .icon=${loading
-                  ? "mdi:camera-outline"
-                  : "mdi:camera-off-outline"}
-                aria-hidden="true"
-              ></ha-icon>
-              <span>${loading ? "Loading camera…" : "Camera unavailable"}</span>
-            </div>`
-          : nothing}
-        </div>
-        </div>
-        <div class="camera-overlay">
-          ${live
-            ? html`<span class="live-pill"
-                ><span class="status-dot" aria-hidden="true"></span>Live</span
-              >`
-            : picture
-              ? html`<span class="live-pill snapshot-pill">Snapshot</span>`
-              : html`<span></span>`}
-          <div class="camera-actions">
-            ${this.cameraLoadError && this.cameraLive ? html`<button
-              class="camera-fullscreen"
-              type="button"
-              title="Retry live stream"
-              aria-label="Retry live stream"
-              @click=${this.retryCamera}
-            ><ha-icon icon="mdi:reload" aria-hidden="true"></ha-icon></button>` : nothing}
-            ${picture || live
-              ? html`<button
-                  class="camera-fullscreen"
-                  type="button"
-                  title=${this.cameraLive ? "Show camera snapshot" : "Show live stream"}
-                  aria-label=${this.cameraLive ? "Show camera snapshot" : "Show live camera stream"}
-                  aria-pressed=${String(!this.cameraLive)}
-                  @click=${() => {
-                    this.cameraLive = !this.cameraLive;
-                    this.cameraZoom.reset();
-                    if (this.cameraLive && this.cameraLoadError) this.retryCamera();
-                  }}
-                >
-                  <ha-icon
-                    .icon=${this.cameraLive ? "mdi:image-outline" : "mdi:video-outline"}
-                    aria-hidden="true"
-                  ></ha-icon>
-                </button>`
-              : nothing}
-            <button
-              class="camera-fullscreen"
-              type="button"
-              title=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
-              aria-label=${this.cameraFullscreen ? "Exit full screen" : "Expand camera"}
-              ?disabled=${this.cameraExpanding}
-              @click=${(event: MouseEvent) => void this.expandCamera(event.currentTarget as HTMLElement)}
-            >
-              <ha-icon .icon=${this.cameraFullscreen ? "mdi:fullscreen-exit" : "mdi:fullscreen"} aria-hidden="true"></ha-icon>
-            </button>
+          <div class="camera-media" style=${`transform:${this.cameraZoom.transform}`}>
+            ${live
+              ? webRtc
+                ? html`<ha-web-rtc-player
+                    .hass=${this.hass}
+                    .entityid=${camera.entity_id}
+                    .controls=${false}
+                    .muted=${true}
+                    autoplay
+                    playsinline
+                  ></ha-web-rtc-player>`
+                : html`<ha-camera-stream
+                    .hass=${this.hass}
+                    .stateObj=${camera}
+                    .controls=${false}
+                    .muted=${true}
+                  ></ha-camera-stream>`
+              : picture
+                ? html`<img
+                    class="camera-image"
+                    src=${picture}
+                    alt="Printer camera snapshot"
+                  />`
+                : nothing}
           </div>
+          ${!live && !picture
+            ? mediaMessage(loading ? "Loading camera…" : "Camera unavailable", {
+                icon: loading ? "mdi:camera-outline" : "mdi:camera-off-outline",
+              })
+            : nothing}
         </div>
-        ${this.cameraFullscreen && this.cameraZoom.state.scale > 1
-          ? html`<button class="camera-zoom-reset" type="button"
-              aria-label="Reset zoom" title="Reset zoom"
-              @click=${() => this.cameraZoom.reset()}>
-              ${formatNumber(this.cameraZoom.state.scale, 1, this.formatContext)}×
-            </button>` : nothing}
+        ${mediaControls(controls)}
+        ${fullscreen
+          ? mediaZoomReset({
+              hass: this.hass,
+              scale: this.cameraZoom.state.scale,
+              onClick: () => this.cameraZoom.reset(),
+            })
+          : nothing}
       </div>
     </section>`;
   }

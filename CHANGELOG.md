@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 — 2026-11-03
+
+- Bundle shared UI 1.6.0 for the camera overlay and progress bar. The printer camera now uses Camera Card's viewer 1:1: the same top-right row of 44px rounded buttons, 8px from the edges and 8px apart, in the minimised card and in fullscreen.
+- The fullscreen button turns blue with an exit icon while fullscreen and collapses the stream on the next press, including desktop browsers where Home Assistant's nested shadow DOM hid the fullscreen state.
+- Camera buttons name what they do next ("Show snapshot", "Show live stream", "Enter fullscreen", "Exit fullscreen"). The Live / Snapshot pill is gone, like in Camera Card; the zoom reset and loading/unavailable messages use the shared style.
+- The stream frame is black and the live player fills it the way Camera Card does; snapshots fill the tile and fit the screen in fullscreen.
+- The print progress bar uses the shared level meter (the same bar as battery charge and fan speed) in the printer's status colour.
+
 ## 0.6.0 — 2026-11-03
 
 - Update the shared UI library to v1.4.0. Status colours (hero, glow, AMS, history records) now follow the Home Assistant theme's success, warning and error colours, so they match the shared chips and notices.

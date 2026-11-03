@@ -328,7 +328,7 @@
       } else if (dialog === "camera") {
         // Exercise the mobile top-layer fallback without relying on the
         // desktop browser's native fullscreen support.
-        card.cameraFallback.open(card.shadowRoot.querySelector(".camera-frame"), card.shadowRoot.querySelector('[aria-label="Expand camera"]'));
+        card.cameraFallback.open(card.shadowRoot.querySelector(".camera-frame"), card.shadowRoot.querySelector('[aria-label="Enter fullscreen"]'));
       }
       await new Promise((resolve) => setTimeout(resolve, 900));
       window.__previewReady = true;

@@ -6,6 +6,7 @@ import {
   glowStyles,
   headerStyles,
   metricStyles,
+  mediaControlStyles,
   mediaFullscreenStyles,
   navigationStyles,
   telemetryStyles,
@@ -21,6 +22,7 @@ export const cardStyles = [
   mediaFullscreenStyles,
   glowStyles,
   componentStyles,
+  mediaControlStyles,
   css`
     :host {
       display: block;
@@ -97,18 +99,6 @@ export const cardStyles = [
       border-radius: 50%;
       background: currentColor;
       flex: 0 0 6px;
-    }
-    .live-pill .status-dot {
-      animation: statusPulse 2.4s ease-in-out infinite;
-    }
-    @keyframes statusPulse {
-      0%,
-      100% {
-        opacity: 1;
-      }
-      50% {
-        opacity: 0.35;
-      }
     }
 
     /* Notices ------------------------------------------------------------ */
@@ -223,23 +213,9 @@ export const cardStyles = [
       font-size: 12px;
       font-weight: 600;
     }
-    .progress-track {
-      height: 7px;
+    .progress-meter {
       margin-top: 9px;
-      border-radius: 999px;
-      background: color-mix(
-        in srgb,
-        var(--primary-text-color) 8%,
-        transparent
-      );
-      overflow: hidden;
-    }
-    .progress-track > span {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: var(--hero-accent, var(--family-active));
-      transition: width 0.35s ease;
+      --family-level-color: var(--hero-accent, var(--family-active));
     }
     .hero-meta {
       display: flex;
@@ -406,6 +382,7 @@ export const cardStyles = [
     }
 
     /* Camera ------------------------------------------------------------- */
+    /* The frame matches Camera Card's viewer; controls come from mediaControlStyles. */
     .camera-tile {
       position: relative;
       z-index: 1;
@@ -419,7 +396,8 @@ export const cardStyles = [
       width: 100%;
       overflow: hidden;
       border-radius: 12px;
-      background: #0b0e14;
+      background: black;
+      color: white;
     }
     .camera-frame:is(:fullscreen, :-webkit-full-screen, [data-media-fullscreen]) {
       width: 100vw;
@@ -427,9 +405,6 @@ export const cardStyles = [
       height: 100dvh;
       aspect-ratio: auto;
       border-radius: 0;
-    }
-    .camera-frame:is(:fullscreen, :-webkit-full-screen, [data-media-fullscreen]) .camera-overlay {
-      inset: max(8px, var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px)) max(8px, var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px)) auto max(8px, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
     }
     .camera-viewport,
     .camera-media {
@@ -440,28 +415,15 @@ export const cardStyles = [
     .camera-media {
       transform-origin: center;
     }
-    .camera-expanded .camera-viewport {
+    .family-media-fullscreen .camera-viewport {
       touch-action: none;
     }
-    .camera-expanded .camera-image {
-      object-fit: contain;
-    }
-    .camera-zoom-reset {
-      position: absolute;
-      bottom: max(8px, var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
-      left: max(8px, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
-      z-index: 2;
-      min-width: 44px;
-      min-height: 44px;
-      padding: 0 12px;
-      border-radius: 12px;
-      color: #fff;
-      background: rgba(5, 8, 12, 0.72);
-      font: inherit;
-      font-weight: 650;
-    }
     .camera-frame ha-camera-stream,
-    .camera-frame ha-web-rtc-player,
+    .camera-frame ha-web-rtc-player {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
     .camera-frame .camera-image {
       display: block;
       width: 100%;
@@ -469,96 +431,14 @@ export const cardStyles = [
       object-fit: cover;
       border: 0;
     }
-    .camera-placeholder {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      gap: 8px;
-      padding: 16px;
-      text-align: center;
-      color: rgba(255, 255, 255, 0.62);
-      background:
-        radial-gradient(
-          circle at 50% 35%,
-          rgba(66, 165, 245, 0.18),
-          transparent 60%
-        ),
-        linear-gradient(160deg, #141a24, #090b10);
-      font-size: 11.5px;
-      line-height: 1.5;
+    .family-media-fullscreen .camera-image {
+      object-fit: contain;
     }
-    .camera-placeholder ha-icon {
-      width: 30px;
-      height: 30px;
-      --mdc-icon-size: 30px;
-      opacity: 0.65;
-    }
-    .camera-overlay {
-      position: absolute;
-      inset: 8px 8px auto 8px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-      pointer-events: none;
-      z-index: 2;
-    }
-    .live-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      min-height: 24px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(5, 8, 12, 0.72);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 650;
-      letter-spacing: 0.01em;
-      backdrop-filter: blur(6px);
-    }
-    .live-pill .status-dot {
-      background: var(--family-error);
-    }
-    .snapshot-pill {
-      color: rgba(255, 255, 255, 0.86);
-      font-weight: 600;
-    }
-    .camera-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      pointer-events: auto;
-    }
-    .camera-fullscreen {
-      pointer-events: auto;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      color: #fff;
-      background: rgba(5, 8, 12, 0.6);
-      backdrop-filter: blur(6px);
-    }
-    .camera-fullscreen ha-icon {
-      width: 21px;
-      height: 21px;
-      --mdc-icon-size: 21px;
-    }
-    .camera-caption {
-      position: absolute;
-      inset: auto 8px 8px 8px;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      pointer-events: none;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 12px;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    /* Undo the card-wide 22px icon box so the shared 24px media icons are not clipped. */
+    .camera-frame ha-icon {
+      width: var(--mdc-icon-size);
+      height: var(--mdc-icon-size);
+      flex: 0 0 auto;
     }
 
     /* Metrics ------------------------------------------------------------ */
