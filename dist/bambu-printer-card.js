@@ -2260,7 +2260,10 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
       align-items: end;
       --family-metric-height: 82px;
     }
+    /* The shared label sits in row 2 of .family-metric-top; these tiles have
+       no top row, so pin it first to keep label, value, note order. */
     .stat .family-metric-label {
+      grid-row: 1;
       align-self: start;
       color: var(--secondary-text-color);
     }
