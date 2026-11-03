@@ -38,6 +38,7 @@ export class BambuPrintChart extends LitElement {
       display: block;
       min-width: 0;
       color: var(--primary-text-color, #1b1b1b);
+      --chart-current-color: color-mix(in srgb, var(--primary-text-color, #1b1b1b) 55%, transparent);
     }
     .legend {
       display: flex;
@@ -61,10 +62,11 @@ export class BambuPrintChart extends LitElement {
       display: inline-block;
     }
     .legend .power i {
-      background: var(--status-active-color, #42a5f5);
+      background: var(--family-active, var(--status-active-color, #42a5f5));
     }
+    /* Current is a second series, not a warning: keep it neutral. */
     .legend .current i {
-      background: var(--status-warn-color, #ff9800);
+      background: var(--chart-current-color);
     }
     .legend .gap {
       margin-left: auto;
@@ -90,20 +92,20 @@ export class BambuPrintChart extends LitElement {
       opacity: 0.75;
     }
     .power-area {
-      fill: var(--status-active-color, #42a5f5);
+      fill: var(--family-active, var(--status-active-color, #42a5f5));
       fill-opacity: 0.13;
       stroke: none;
     }
     .power-line {
       fill: none;
-      stroke: var(--status-active-color, #42a5f5);
+      stroke: var(--family-active, var(--status-active-color, #42a5f5));
       stroke-width: 2;
       stroke-linejoin: round;
       stroke-linecap: round;
     }
     .current-line {
       fill: none;
-      stroke: var(--status-warn-color, #ff9800);
+      stroke: var(--chart-current-color);
       stroke-width: 1.5;
       stroke-linejoin: round;
       stroke-linecap: round;

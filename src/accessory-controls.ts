@@ -7,6 +7,7 @@ import {
   dialogStyles,
   familyStyles,
   notice,
+  pendingIndicator,
   renderFamilyDialog,
 } from "@bitosome/ha-card-ui";
 import type { HomeAssistant, PrinterStatus } from "./types";
@@ -197,7 +198,8 @@ export class PrinterAccessoryControls extends LitElement {
       ?disabled=${unavailable || !!pending}
       @click=${(event: Event) => this.toggle(kind, event.currentTarget as HTMLElement)}
     >
-      <ha-icon .icon=${kind === "printer" ? "mdi:power" : "mdi:air-purifier"} aria-hidden="true"></ha-icon>
+      ${pending ? pendingIndicator()
+        : html`<ha-icon .icon=${kind === "printer" ? "mdi:power" : "mdi:air-purifier"} aria-hidden="true"></ha-icon>`}
       <span class="copy"><span class="label">${label}</span>
         <span class="state" aria-live="polite">${state}${pending ? " · Updating…" : ""}</span>
       </span>
@@ -215,13 +217,15 @@ export class PrinterAccessoryControls extends LitElement {
         } }) : nothing)}</div>
       ${renderFamilyDialog(this.flow, {
         title: "Turn off printer?",
+        footerLayout: "equal",
         ariaDescribedBy: "power-off-description",
         content: html`<p id="power-off-description">This cuts power to the printer.${activeJob
           ? " A print is in progress or paused and will be interrupted."
           : " Make sure printing and cooling have finished."}</p>
           ${this.switchState("printer") === "unavailable" ? html`<p>Printer power is unavailable. Wait for it to reconnect.</p>` : nothing}`,
-        footer: html`${actionPill({ label: "Cancel", onClick: this.flow.close })}
-          ${actionPill({ label: "Turn off printer", icon: "mdi:power", destructive: true,
+        // Destructive: Cancel takes first focus so Enter cannot cut power.
+        footer: html`${actionPill({ label: "Cancel", onClick: this.flow.close, initialFocus: true })}
+          ${actionPill({ label: "Turn off printer", icon: "mdi:power", emphasis: "destructive",
             disabled: this.switchState("printer") !== "on" || !!this.pending.printer,
             onClick: this.confirmPowerOff })}`,
       })}

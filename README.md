@@ -226,7 +226,8 @@ before the Recorder window is marked partial. The chart always shows the last
 ## Design and interaction
 
 The card composes the shared `@bitosome/ha-card-ui` tokens, family surfaces,
-metric grid, notices, glow helpers and native dialog flow. It follows the same
+metric grid, notices, state chips, loading/empty/error states, pending
+indicators, glow helpers and native dialog flow. It follows the same
 rules as the other bitosome cards:
 
 - main readings stay on the card; metric and telemetry tiles open Home
@@ -293,7 +294,7 @@ not contact a printer. `npm run build` emits the single
 `dist/bambu-printer-card.js` bundle committed for HACS releases.
 
 The shared library is pinned to
-`@bitosome/ha-card-ui@1.0.1` and bundled into the card. The card has no runtime
+`@bitosome/ha-card-ui@1.4.0` and bundled into the card. The card has no runtime
 dependency on a sibling repository.
 
 ## License

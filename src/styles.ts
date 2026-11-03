@@ -71,7 +71,7 @@ export const cardStyles = [
     }
     button:focus-visible,
     summary:focus-visible {
-      outline: 3px solid var(--primary-color, var(--status-active-color));
+      outline: 3px solid var(--primary-color, var(--family-active));
       outline-offset: 3px;
     }
     ha-icon {
@@ -83,10 +83,6 @@ export const cardStyles = [
     }
 
     /* Header ------------------------------------------------------------- */
-    .family-brand {
-      background: color-mix(in srgb, var(--primary-color) 11%, transparent);
-      color: var(--primary-color);
-    }
     .family-title-row {
       display: flex;
       align-items: center;
@@ -195,12 +191,12 @@ export const cardStyles = [
       margin-top: 12px;
     }
     .hero-percent {
-      font-size: clamp(34px, 10cqw, 46px);
+      font-size: clamp(38px, 10cqw, 46px);
       line-height: 1;
       font-weight: 550;
       letter-spacing: -0.055em;
       font-variant-numeric: tabular-nums;
-      color: var(--hero-accent, var(--status-active-color));
+      color: var(--hero-accent, var(--family-active));
     }
     .hero-percent small {
       font-size: 16px;
@@ -242,7 +238,7 @@ export const cardStyles = [
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: var(--hero-accent, var(--status-active-color));
+      background: var(--hero-accent, var(--family-active));
       transition: width 0.35s ease;
     }
     .hero-meta {
@@ -357,10 +353,10 @@ export const cardStyles = [
       border-radius: 50%;
       display: grid;
       place-items: center;
-      color: var(--status-active-color);
+      color: var(--family-active);
       background: color-mix(
         in srgb,
-        var(--status-active-color) 12%,
+        var(--family-active) 12%,
         transparent
       );
     }
@@ -523,7 +519,7 @@ export const cardStyles = [
       backdrop-filter: blur(6px);
     }
     .live-pill .status-dot {
-      background: var(--status-alert-color, #e53935);
+      background: var(--family-error);
     }
     .snapshot-pill {
       color: rgba(255, 255, 255, 0.86);
@@ -657,26 +653,11 @@ export const cardStyles = [
         background-position: -30% 0;
       }
     }
-    .chart-error {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+    .chart-state {
+      display: grid;
+      align-content: center;
       min-height: 60px;
-      padding: 10px 8px;
-      color: var(--secondary-text-color);
-      font-size: 11.5px;
-      line-height: 1.5;
-    }
-    .text-button {
-      min-height: 44px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      background: transparent;
-      color: var(--primary-color, var(--status-active-color));
-      font-size: 12px;
-      font-weight: 600;
+      padding: 8px;
     }
 
     /* AMS ---------------------------------------------------------------- */
@@ -702,21 +683,7 @@ export const cardStyles = [
       line-height: 1.3;
     }
     .section-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      min-height: 24px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      color: var(--secondary-text-color);
-      background: color-mix(
-        in srgb,
-        var(--primary-text-color) 6%,
-        transparent
-      );
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.3;
+      flex: 0 0 auto;
       white-space: nowrap;
     }
     .ams-grid {
@@ -749,20 +716,6 @@ export const cardStyles = [
       font-weight: 650;
       line-height: 1.3;
     }
-    .ams-state {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      color: var(--status-active-color);
-      font-size: 10px;
-      font-weight: 650;
-      line-height: 1.3;
-    }
-    .ams-state .status-dot {
-      width: 5px;
-      height: 5px;
-      flex: 0 0 5px;
-    }
     .ams-env {
       margin-left: auto;
       color: var(--secondary-text-color);
@@ -772,22 +725,7 @@ export const cardStyles = [
       white-space: nowrap;
     }
     .ams-drying {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      min-height: 22px;
       margin-top: 7px;
-      padding: 2px 7px;
-      border-radius: 999px;
-      color: var(--status-warn-color);
-      background: color-mix(
-        in srgb,
-        var(--status-warn-color) 11%,
-        transparent
-      );
-      font-size: 10px;
-      font-weight: 600;
-      line-height: 1.3;
     }
     .trays {
       display: grid;
@@ -818,12 +756,12 @@ export const cardStyles = [
     .tray.active {
       border-color: color-mix(
         in srgb,
-        var(--status-active-color) 52%,
+        var(--family-active) 52%,
         transparent
       );
       background: color-mix(
         in srgb,
-        var(--status-active-color) 7%,
+        var(--family-active) 7%,
         transparent
       );
     }
@@ -876,7 +814,7 @@ export const cardStyles = [
       display: flex;
       align-items: center;
       gap: 4px;
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1.35;
       color: var(--secondary-text-color);
       font-variant-numeric: tabular-nums;
@@ -885,7 +823,7 @@ export const cardStyles = [
       white-space: nowrap;
     }
     .tray-meta .active-label {
-      color: var(--status-active-color);
+      color: var(--family-active);
       font-weight: 650;
     }
     .tray-bar {
@@ -934,7 +872,7 @@ export const cardStyles = [
       padding: 8px 6px 8px 10px;
       border-radius: 9px;
       background: transparent;
-      color: var(--primary-color, var(--status-active-color));
+      color: var(--primary-color, var(--family-active));
       font-size: 11.5px;
       font-weight: 600;
     }
@@ -1013,7 +951,7 @@ export const cardStyles = [
     }
     .ams-summary-copy small {
       color: var(--secondary-text-color);
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1.35;
       font-variant-numeric: tabular-nums;
       overflow: hidden;
@@ -1046,7 +984,7 @@ export const cardStyles = [
       );
     }
     .ams-dot.active {
-      outline: 2px solid var(--status-active-color);
+      outline: 2px solid var(--family-active);
       outline-offset: 1px;
     }
     .ams-dot.empty {
@@ -1055,7 +993,7 @@ export const cardStyles = [
     .ams-summary-loaded {
       margin-left: auto;
       color: var(--secondary-text-color);
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1.3;
       white-space: nowrap;
     }
@@ -1183,37 +1121,18 @@ export const cardStyles = [
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
+    /* History totals reuse the shared metric tile with one extra note line. */
     .stat {
-      display: grid;
-      gap: 4px;
-      min-height: 82px;
-      padding: 12px;
-      border-radius: 12px;
-      background: color-mix(
-        in srgb,
-        var(--primary-text-color) 3%,
-        transparent
-      );
-      border: 1px solid
-        color-mix(in srgb, var(--primary-text-color) 6%, transparent);
-      min-width: 0;
+      grid-template-rows: auto 1fr auto;
+      align-items: end;
+      --family-metric-height: 82px;
     }
-    .stat-label {
-      font-size: 12px;
-      line-height: 1.3;
+    .stat .family-metric-label {
+      align-self: start;
       color: var(--secondary-text-color);
     }
-    .stat-value {
-      align-self: end;
-      font-size: 20px;
-      font-weight: 650;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      font-variant-numeric: tabular-nums;
-      overflow-wrap: anywhere;
-    }
     .stat-sub {
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1.3;
       color: var(--secondary-text-color);
     }
@@ -1243,7 +1162,7 @@ export const cardStyles = [
       min-width: 0;
     }
     .print-record {
-      border-radius: 12px;
+      border-radius: var(--tile-border-radius, 12px);
       border: 1px solid
         color-mix(in srgb, var(--primary-text-color) 7%, transparent);
       background: color-mix(
@@ -1254,16 +1173,16 @@ export const cardStyles = [
       overflow: hidden;
     }
     .print-record[data-tone="accent"] {
-      --record-tone: var(--status-active-color);
+      --record-tone: var(--family-active);
     }
     .print-record[data-tone="success"] {
-      --record-tone: var(--status-success-color);
+      --record-tone: var(--family-success);
     }
     .print-record[data-tone="warning"] {
-      --record-tone: var(--status-warn-color);
+      --record-tone: var(--family-warning);
     }
     .print-record[data-tone="error"] {
-      --record-tone: var(--status-alert-color);
+      --record-tone: var(--family-error);
     }
     .print-record summary {
       display: flex;
@@ -1277,6 +1196,17 @@ export const cardStyles = [
     }
     .print-record summary::-webkit-details-marker {
       display: none;
+    }
+    .record-chevron {
+      width: 20px;
+      height: 20px;
+      --mdc-icon-size: 20px;
+      flex: 0 0 20px;
+      color: var(--secondary-text-color);
+      transition: transform 0.2s ease;
+    }
+    .print-record[open] .record-chevron {
+      transform: rotate(180deg);
     }
     .record-copy,
     .record-value {
@@ -1334,10 +1264,10 @@ export const cardStyles = [
       margin: 6px 0 0;
     }
     .record-details .warn {
-      color: var(--status-warn-color);
+      color: var(--family-warning);
     }
     .record-details .error {
-      color: var(--status-alert-color);
+      color: var(--family-error);
     }
     .empty-state {
       display: grid;
@@ -1466,9 +1396,6 @@ export const cardStyles = [
       .cost-label {
         white-space: normal;
       }
-      .stat-value {
-        font-size: 18px;
-      }
     }
     @container (max-width: 340px) {
       .hero-art {
@@ -1480,7 +1407,7 @@ export const cardStyles = [
         font-size: 19px;
       }
       .hero-percent {
-        font-size: 34px;
+        font-size: 38px;
       }
       .trays,
       .external-grid {

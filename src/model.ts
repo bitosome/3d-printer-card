@@ -255,15 +255,15 @@ export interface StatusGlow {
 export function statusGlow(status: PrinterStatus): StatusGlow {
   switch (status) {
     case "printing":
-      return { mode: "pulse", active: true, color: "var(--status-active-color)" };
+      return { mode: "pulse", active: true, color: "var(--family-active)" };
     case "preparing":
-      return { mode: "static", active: true, color: "var(--status-active-color)" };
+      return { mode: "static", active: true, color: "var(--family-active)" };
     case "paused":
-      return { mode: "static", active: true, color: "var(--status-warn-color)" };
+      return { mode: "static", active: true, color: "var(--family-warning)" };
     case "finished":
-      return { mode: "static", active: true, color: "var(--status-success-color)" };
+      return { mode: "static", active: true, color: "var(--family-success)" };
     case "failed":
-      return { mode: "static", active: true, color: "var(--status-alert-color)" };
+      return { mode: "static", active: true, color: "var(--family-error)" };
     default:
       return { mode: "none", active: false, color: "transparent" };
   }
@@ -1108,10 +1108,11 @@ export function formatDuration(
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
+  // Same wording as formatEta and the shared formatter: `1 h 5 min`.
   const pieces: string[] = [];
-  if (days) pieces.push(`${days}d`);
-  if (hours) pieces.push(`${hours}h`);
-  if (minutes || (!days && !hours)) pieces.push(`${minutes}m`);
+  if (days) pieces.push(`${days} d`);
+  if (hours) pieces.push(`${hours} h`);
+  if (minutes || (!days && !hours)) pieces.push(`${minutes} min`);
   if (short) return pieces.slice(0, 2).join(" ");
   return pieces.join(" ");
 }

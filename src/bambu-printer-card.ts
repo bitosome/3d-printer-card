@@ -12,8 +12,11 @@ import {
   FamilyFlowController,
   MediaZoomController,
   MediaFullscreenFallbackController,
+  NOT_CONFIGURED_TEXT,
   UI_ICONS,
+  UNAVAILABLE_TEXT,
   actionPill,
+  asyncState,
   buildGlow,
   designTokens,
   createMediaFullscreenAPI,
@@ -130,13 +133,13 @@ function humanize(value: string | null | undefined): string {
 function heroAccent(status: PrinterStatus): string {
   switch (status) {
     case "paused":
-      return "var(--status-warn-color)";
+      return "var(--family-warning)";
     case "finished":
-      return "var(--status-success-color)";
+      return "var(--family-success)";
     case "failed":
-      return "var(--status-alert-color)";
+      return "var(--family-error)";
     default:
-      return "var(--status-active-color)";
+      return "var(--family-active)";
   }
 }
 
@@ -1245,7 +1248,7 @@ export class BambuPrinterCard extends LitElement {
       <small>${updated}</small>
       ${actionPill({
         label: this.historyLoading ? "Refreshing…" : "Refresh",
-        icon: UI_ICONS.history,
+        icon: "mdi:refresh",
         onClick: () => void this.loadHistory(true),
         pending: this.historyLoading,
         pendingLabel: "Refreshing…",
@@ -1857,8 +1860,8 @@ export class BambuPrinterCard extends LitElement {
         ><ha-icon .icon=${icon} aria-hidden="true"></ha-icon
         ><span class="family-metric-label">${label}</span></span
       >
-      <span class="family-metric-value ${unavailable ? "missing" : ""}"
-        >${unavailable ? "Unavailable" : value}${!unavailable && unit
+      <span class="family-metric-value ${unavailable ? "missing family-unavailable" : ""}"
+        >${unavailable ? UNAVAILABLE_TEXT : value}${!unavailable && unit
           ? html`<small>${unit}</small>`
           : nothing}</span
       >
@@ -2100,15 +2103,14 @@ export class BambuPrinterCard extends LitElement {
           ></bambu-print-chart>`
         : this.overviewLoading
           ? html`<div class="chart-skeleton" aria-label="Loading power history"></div>`
-          : html`<div class="chart-error">
-              <span>${this.overviewError || "No recorded power history yet."}</span>
-              <button
-                class="text-button"
-                type="button"
-                @click=${() => void this.loadOverview(true)}
-              >
-                Retry
-              </button>
+          : html`<div class="chart-state">
+              ${this.overviewError
+                ? asyncState({
+                    state: "error",
+                    message: `Could not load power history. ${this.overviewError}`,
+                    onRetry: () => void this.loadOverview(true),
+                  })
+                : asyncState({ state: "empty", message: "No recorded power history yet." })}
             </div>`}
     </section>`;
   }
@@ -2195,10 +2197,7 @@ export class BambuPrinterCard extends LitElement {
     ]
       .filter((value): value is string => !!value)
       .join(" · ");
-    const remain =
-      focus && focus.remainEnabled && focus.remain !== null
-        ? `${formatNumber(focus.remain, 0, this.formatContext)}%`
-        : null;
+    const remain = remainText(focus, this.formatContext);
     const meta = focus
       ? [focus.type || null, remain, focus.active ? "Active" : null]
           .filter((value): value is string => !!value)
@@ -2214,9 +2213,7 @@ export class BambuPrinterCard extends LitElement {
       <span class="ams-summary-head">
         <span class="ams-name">${unit.label}</span>
         ${unit.active
-          ? html`<span class="ams-state"
-              ><span class="status-dot" aria-hidden="true"></span>Active</span
-            >`
+          ? stateChip({ label: "Active", tone: "accent", className: "ams-state" })
           : nothing}
         ${environment ? html`<span class="ams-env">${environment}</span>` : nothing}
       </span>
@@ -2264,9 +2261,7 @@ export class BambuPrinterCard extends LitElement {
       <span class="ams-summary-head">
         <span class="ams-name">External</span>
         ${focus?.active
-          ? html`<span class="ams-state"
-              ><span class="status-dot" aria-hidden="true"></span>Active</span
-            >`
+          ? stateChip({ label: "Active", tone: "accent", className: "ams-state" })
           : nothing}
         <span class="ams-env">${loaded}/${spools.length} loaded</span>
       </span>
@@ -2278,7 +2273,11 @@ export class BambuPrinterCard extends LitElement {
         ></span>
         <span class="ams-summary-copy">
           <strong>${focus && !focus.empty ? focus.name : "No filament loaded"}</strong>
-          <small>${focus && !focus.empty ? [focus.type, focus.remain].filter(Boolean).join(" · ") : "External spool"}</small>
+          <small>${focus && !focus.empty
+            ? [focus.type || null, remainText(focus, this.formatContext), focus.active ? "Active" : null]
+              .filter((value): value is string => !!value)
+              .join(" · ")
+            : "External spool"}</small>
         </span>
       </span>
     </button>`;
@@ -2326,7 +2325,7 @@ export class BambuPrinterCard extends LitElement {
     return html`<section class="ams-section">
       <div class="section-title">
         <h2>AMS</h2>
-        <span class="section-chip">${summary}</span>
+        ${stateChip({ label: summary, className: "section-chip" })}
       </div>
       <div class="ams-grid">
         ${units.map((unit) => {
@@ -2347,25 +2346,21 @@ export class BambuPrinterCard extends LitElement {
             <div class="ams-head">
               <span class="ams-name">${unit.label}</span>
               ${unit.active
-                ? html`<span class="ams-state"
-                    ><span class="status-dot" aria-hidden="true"></span
-                    >Active</span
-                  >`
+                ? stateChip({ label: "Active", tone: "accent", className: "ams-state" })
                 : nothing}
               ${environment
                 ? html`<span class="ams-env">${environment}</span>`
                 : nothing}
             </div>
             ${unit.drying
-              ? html`<span class="ams-drying"
-                  ><ha-icon
-                    icon="mdi:hair-dryer-outline"
-                    aria-hidden="true"
-                  ></ha-icon
-                  >Drying${unit.dryingRemaining && unit.dryingRemaining > 0
+              ? stateChip({
+                  label: `Drying${unit.dryingRemaining && unit.dryingRemaining > 0
                     ? ` · ${formatDuration(unit.dryingRemaining * 60_000)}`
-                    : ""}</span
-                >`
+                    : ""}`,
+                  icon: "mdi:hair-dryer-outline",
+                  tone: "warning",
+                  className: "ams-drying",
+                })
               : nothing}
             <div class="trays">
               ${unit.trays.map((tray) => this.trayButton(tray, unit.label))}
@@ -2421,7 +2416,10 @@ export class BambuPrinterCard extends LitElement {
     value: string,
     entityId?: string | null,
   ): TemplateResult {
-    const content = html`<span>${label}</span><b>${value}</b>`;
+    // Missing readings say Unavailable rather than a bare dash.
+    const missing = value === "—";
+    if (missing) value = UNAVAILABLE_TEXT;
+    const content = html`<span>${label}</span><b class=${missing ? "family-unavailable" : ""}>${value}</b>`;
     return entityId && this.hass?.states[entityId]
       ? html`<button
           class="data-row"
@@ -2747,52 +2745,33 @@ export class BambuPrinterCard extends LitElement {
         </p>
       </div>
       <div class="stat-grid">
-        <div class="stat">
-          <span class="stat-label">Total cost</span>
-          <strong class="stat-value"
-            >${this.costConfigured
-              ? formatCurrency(totalCost, this.formatContext)
-              : "—"}</strong
-          >
-          <span class="stat-sub"
-            >${sessions.length} print${sessions.length === 1 ? "" : "s"} in
-            ${days} day${days === 1 ? "" : "s"}</span
-          >
-        </div>
-        <div class="stat">
-          <span class="stat-label">Electricity used</span>
-          <strong class="stat-value">${formatEnergy(totalEnergy, this.formatContext)}</strong>
-          <span class="stat-sub"
-            >${days} day recorder window</span
-          >
-        </div>
-        <div class="stat">
-          <span class="stat-label">Average per print</span>
-          <strong class="stat-value"
-            >${average !== null
-              ? formatCurrency(average, this.formatContext)
-              : "—"}</strong
-          >
-          <span class="stat-sub"
-            >${priced.length} priced print${priced.length === 1 ? "" : "s"}</span
-          >
-        </div>
-        <div class="stat">
-          <span class="stat-label">Priced energy</span>
-          <strong class="stat-value"
-            >${formatEnergy(
-              quoted.reduce(
-                (total, item) => total + (item.quote?.pricedEnergy ?? 0),
-                0,
-              ), this.formatContext,
-            )}</strong
-          >
-          <span class="stat-sub"
-            >${quoted.some((item) => (item.quote?.gaps ?? false))
-              ? "Some periods were not observed"
-              : "Recorder samples"}</span
-          >
-        </div>
+        ${this.stat(
+          "Total cost",
+          this.costConfigured ? formatCurrency(totalCost, this.formatContext) : NOT_CONFIGURED_TEXT,
+          `${sessions.length} print${sessions.length === 1 ? "" : "s"} in ${days} day${days === 1 ? "" : "s"}`,
+          !this.costConfigured,
+        )}
+        ${this.stat(
+          "Electricity used",
+          formatEnergy(totalEnergy, this.formatContext),
+          `${days} day recorder window`,
+        )}
+        ${this.stat(
+          "Average per print",
+          average !== null ? formatCurrency(average, this.formatContext) : UNAVAILABLE_TEXT,
+          `${priced.length} priced print${priced.length === 1 ? "" : "s"}`,
+          average === null,
+        )}
+        ${this.stat(
+          "Priced energy",
+          formatEnergy(
+            quoted.reduce((total, item) => total + (item.quote?.pricedEnergy ?? 0), 0),
+            this.formatContext,
+          ),
+          quoted.some((item) => (item.quote?.gaps ?? false))
+            ? "Some periods were not observed"
+            : "Recorder samples",
+        )}
       </div>
       ${chart
         ? html`<section class="history-chart family-surface">
@@ -2811,45 +2790,33 @@ export class BambuPrinterCard extends LitElement {
         : nothing}
       <div class="section-title">
         <h3>Print sessions</h3>
-        <span class="section-chip"
-          >${loading ? "Loading…" : `${sessions.length} record${sessions.length === 1 ? "" : "s"}`}</span
-        >
+        ${stateChip({
+          label: loading ? "Loading…" : `${sessions.length} record${sessions.length === 1 ? "" : "s"}`,
+          className: "section-chip",
+        })}
       </div>
       ${this.historyError
-        ? html`<div class="empty-state">
-            <strong>History could not be loaded</strong>
-            <span>${this.historyError}</span>
-            <div>
-              ${actionPill({
-                label: "Try again",
-                icon: UI_ICONS.history,
-                onClick: () => void this.loadHistory(true),
-              })}
-            </div>
-          </div>`
+        ? asyncState({
+            state: "error",
+            message: `Could not load print history. ${this.historyError}`,
+            onRetry: () => void this.loadHistory(true),
+            retrying: this.historyLoading,
+          })
         : loading
-          ? html`<div class="empty-state">
-              <strong>Reading recorder history…</strong>
-              <span
-                >Print sessions are derived from the Bambu print status and cost
-                from recorded power and tariffs.</span
-              >
-            </div>`
+          ? asyncState({ state: "loading", message: "Reading recorder history…" })
           : sessions.length
             ? html`<div class="history-list">
                 ${repeat(quoted, ({ session }) => session.start, ({ session, quote }) =>
                   this.renderRecord(session, quote),
                 )}
               </div>`
-            : html`<div class="empty-state">
-                <strong>No print sessions in this window</strong>
-                <span
-                  >A session is recorded when the Bambu status moves to prepare
+            : html`${asyncState({ state: "empty", message: "No print sessions in this window" })}
+                <p class="hint">
+                  A session is recorded when the Bambu status moves to prepare
                   or running and ends at finish, failed or idle. The card uses
                   Home Assistant Recorder history only; prints older than the
-                  recorder retention are not reconstructed.</span
-                >
-              </div>`}
+                  recorder retention are not reconstructed.
+                </p>`}
       <p class="hint">
         Sessions that started before the recorder window are marked partial.
         Long telemetry gaps are skipped instead of being filled with stale
@@ -2857,6 +2824,14 @@ export class BambuPrinterCard extends LitElement {
         how far back this list can go; the card can request up to
         ${MAX_HISTORY_DAYS} days.
       </p>
+    </div>`;
+  }
+
+  private stat(label: string, value: string, sub: string, missing = false): TemplateResult {
+    return html`<div class="stat family-metric family-surface">
+      <span class="family-metric-label">${label}</span>
+      <strong class="family-metric-value ${missing ? "missing family-unavailable" : ""}">${value}</strong>
+      <span class="stat-sub">${sub}</span>
     </div>`;
   }
 
@@ -2895,6 +2870,7 @@ export class BambuPrinterCard extends LitElement {
               : ""}</small
           >
         </span>
+        <ha-icon class="record-chevron" .icon=${UI_ICONS.expand} aria-hidden="true"></ha-icon>
       </summary>
       <div class="record-details">
         <p>
@@ -2938,6 +2914,15 @@ export class BambuPrinterCard extends LitElement {
       </div>
     </details>`;
   }
+}
+
+/** Remaining filament as a locale percentage; disabled or unknown (-1) readings are omitted. */
+function remainText(
+  spool: { remain: number | null; remainEnabled: boolean } | null | undefined,
+  context: ReturnType<typeof localeContext>,
+): string | null {
+  if (!spool || !spool.remainEnabled || spool.remain === null || spool.remain < 0) return null;
+  return `${formatNumber(Math.min(100, spool.remain), 0, context)}%`;
 }
 
 function formatClockSpan(

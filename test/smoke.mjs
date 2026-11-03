@@ -268,7 +268,7 @@ check(
   "details show print job, elapsed time and formatted material data",
   detailsText.includes("Print job") &&
     detailsText.includes("Elapsed") &&
-    detailsText.includes("1h") &&
+    detailsText.includes("1 h") &&
     detailsText.includes("Textured plate") &&
     detailsText.includes("Standard"),
   detailsText.slice(0, 250),
@@ -282,6 +282,29 @@ check(
 check("no services were called from the details dialog", serviceCalls.length === 0);
 dialog?.querySelector(".family-icon-button[title='Close']")?.click();
 await tick(100);
+
+// External spool remaining and AMS chips ------------------------------------
+const spoolId = Object.keys(hass.states).find((id) => id.endsWith("_externalspool_external_spool"));
+const spoolText = async (remain) => {
+  card.hass = { ...hass, states: { ...hass.states, [spoolId]: { ...hass.states[spoolId], state: "Generic PLA",
+    attributes: { name: "Generic PLA", type: "PLA", remain, color: "#FF0000FF" } } } };
+  await tick(80);
+  return text([...root.querySelectorAll(".ams-summary-tile")].at(-1)?.querySelector(".ams-summary-copy small"));
+};
+const spool45 = await spoolText(45);
+const spoolUnknown = await spoolText(-1);
+const spoolZero = await spoolText(0);
+check(
+  "external spool summary formats remaining filament like AMS trays",
+  spool45 === "PLA · 45%" && spoolUnknown === "PLA" && spoolZero === "PLA · 0%",
+  JSON.stringify([spool45, spoolUnknown, spoolZero]),
+);
+check(
+  "AMS state uses the shared chip",
+  [...root.querySelectorAll(".ams-summary-tile .family-chip.ams-state")].some((chip) => text(chip) === "Active"),
+);
+card.hass = hass;
+await tick(80);
 
 // Offline state ------------------------------------------------------------
 const statusId = cardConfig.printer_entity;

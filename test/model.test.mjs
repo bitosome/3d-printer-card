@@ -401,8 +401,9 @@ check("configuration clamps history days and rejects bad currency", () => {
 
 check("formatting stays readable", () => {
   assert.match(formatCurrency(0.42, { currency: "EUR", locale: "en-US" }), /0\.42/);
-  assert.equal(formatDuration(90 * 60_000), "1h 30m");
-  assert.equal(formatDuration(42 * 1000), "1m");
+  assert.equal(formatDuration(90 * 60_000), "1 h 30 min");
+  assert.equal(formatDuration(42 * 1000), "1 min");
+  assert.equal(formatDuration((26 * 60 + 5) * 60_000), "1 d 2 h");
 });
 
 check("HA numeric preferences override UI language consistently", () => {

@@ -60,5 +60,12 @@ editor.remove();
 const cardCss = customElements.get("bambu-printer-card").elementStyles
   .map((sheet) => sheet.cssText).join("\n");
 assert.match(cardCss, /printer-accessory-controls\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/);
+// Card-owned CSS resolves status colour through the shared --family-* aliases only.
+const ownCss = customElements.get("bambu-printer-card").elementStyles.at(-1).cssText;
+assert.match(ownCss, /\.hero-percent/);
+assert.doesNotMatch(ownCss, /--status-|--(success|warning|error)-color/);
+assert.doesNotMatch(ownCss, /\.text-button|\.family-brand\s*\{/);
+const chartCss = customElements.get("bambu-print-chart").elementStyles.map((sheet) => sheet.cssText).join("\n");
+assert.doesNotMatch(chartCss, /--status-warn-color/, "current is a neutral series, not a warning");
 await win.happyDOM.close();
 console.log("PASS: chart data summaries and editor switch accessibility");

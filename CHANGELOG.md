@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-11-03
+
+- Update the shared UI library to v1.4.0. Status colours (hero, glow, AMS, history records) now follow the Home Assistant theme's success, warning and error colours, so they match the shared chips and notices.
+- Show a spinner on the printer power and air purifier buttons while a change is pending instead of fading them like Unavailable; the History Refresh button does the same and now uses a refresh icon.
+- Give the printer power-off confirmation two equal buttons and focus Cancel first.
+- Show the external spool's remaining filament as a percentage, like AMS trays; an unknown reading is hidden and a real 0% is kept.
+- Use the shared chips for AMS Active, Drying and section counts, and the shared metric tiles for History totals.
+- Show History and power-chart loading, empty and error states in the shared style, with one Try again action. History records show an expand chevron.
+- Missing values in Details and History say "Unavailable" (or "Not configured" for cost without sensors) instead of "—". Durations read "1 h 5 min" everywhere.
+- Raise 10px AMS and History labels to 11px and keep the progress percentage at least 38px on narrow cards. The chart's current line is now neutral rather than warning orange.
+
 ## 0.5.1 — 2026-11-03
 
 - Keep the printer power and air purifier buttons above the hero glow. The glow extends below the hero tile and was painting over them while printing, paused, finished or failed.
