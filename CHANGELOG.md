@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-11-03
+
+- Keep the printer power and air purifier buttons above the hero glow. The glow extends below the hero tile and was painting over them while printing, paused, finished or failed.
+
 ## 0.5.0 — 2026-11-02
 
 - Show when a running print will be ready next to the remaining time, e.g. "Ready 14:35" or "Ready tomorrow 02:10"; later days show the weekday or date.

@@ -55,5 +55,10 @@ for (const control of switches) {
 assert.equal(switches[0].getAttribute("aria-label"), "Show live camera");
 assert.equal(switches[1].getAttribute("aria-label"), "Show AMS");
 editor.remove();
+
+// The hero glow extends below the hero tile; the plug row must stay on the face layer.
+const cardCss = customElements.get("bambu-printer-card").elementStyles
+  .map((sheet) => sheet.cssText).join("\n");
+assert.match(cardCss, /printer-accessory-controls\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/);
 await win.happyDOM.close();
 console.log("PASS: chart data summaries and editor switch accessibility");

@@ -1096,6 +1096,11 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
     .hero-wrap {
       min-width: 0;
     }
+    /* Keep the plug row above the hero glow, which extends below the hero tile. */
+    printer-accessory-controls {
+      position: relative;
+      z-index: 1;
+    }
     .hero {
       position: relative;
       z-index: 1;
